@@ -1,16 +1,22 @@
 "use client"
 import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useAuth } from "../../context/AuthContext"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
 
+  const router = useRouter()
+  const { login } = useAuth()
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (email === "user@example.com" && password === "baby123") {
-      alert("✅ Logged in successfully!")
+    const success = login(email, password)
+    if (success) {
+      router.push("/")
     } else {
       setError("Invalid email or password")
     }

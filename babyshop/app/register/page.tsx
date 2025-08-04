@@ -1,15 +1,18 @@
 "use client"
 import { useState } from "react"
 import Link from "next/link"
+import { useAuth } from "../../context/AuthContext"
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [registered, setRegistered] = useState(false)
 
+  const { register } = useAuth()
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // mock "register"
+    register(email, password)
     setRegistered(true)
   }
 

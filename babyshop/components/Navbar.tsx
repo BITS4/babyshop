@@ -2,10 +2,12 @@
 
 import Link from "next/link"
 import { useCart } from "../context/CartContext"
+import { useAuth } from "../context/AuthContext"
 import { ShoppingCartIcon } from "@heroicons/react/24/outline"
 
 export default function Navbar() {
   const { cart } = useCart()
+  const { user, logout } = useAuth()
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0)
 
   return (
@@ -15,6 +17,7 @@ export default function Navbar() {
       </Link>
       <nav className="flex items-center space-x-6 text-gray-700">
         <Link href="/" className="hover:text-pink-500">Home</Link>
+
         <Link href="/cart" className="relative hover:text-pink-500 flex items-center">
           <ShoppingCartIcon className="h-6 w-6" />
           {itemCount > 0 && (
@@ -23,8 +26,20 @@ export default function Navbar() {
             </span>
           )}
         </Link>
-        <Link href="/login" className="hover:text-pink-500">Login</Link>
-        <Link href="/register" className="hover:text-pink-500">Register</Link>
+
+        {user ? (
+          <div className="flex items-center space-x-4">
+            <span className="text-sm text-gray-600">Welcome, {user}</span>
+            <button onClick={logout} className="text-pink-500 hover:underline">
+              Logout
+            </button>
+          </div>
+        ) : (
+          <>
+            <Link href="/login" className="hover:text-pink-500">Login</Link>
+            <Link href="/register" className="hover:text-pink-500">Register</Link>
+          </>
+        )}
       </nav>
     </header>
   )
