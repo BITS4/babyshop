@@ -1,13 +1,30 @@
-// src/components/Navbar.tsx
+"use client"
+
+import Link from "next/link"
+import { useCart } from "../context/CartContext"
+import { ShoppingCartIcon } from "@heroicons/react/24/outline"
+
 export default function Navbar() {
+  const { cart } = useCart()
+  const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0)
+
   return (
     <header className="w-full bg-white shadow-md py-4 px-6 flex justify-between items-center">
-      <h1 className="text-2xl font-bold text-pink-500">BabyShop</h1>
-      <nav className="space-x-4 text-gray-700">
-        <a href="#" className="hover:text-pink-500">Home</a>
-        <a href="#" className="hover:text-pink-500">Shop</a>
-        <a href="#" className="hover:text-pink-500">Contact</a>
-        <a href="#" className="hover:text-pink-500">Cart</a>
+      <Link href="/">
+        <h1 className="text-2xl font-bold text-pink-500">BabyShop</h1>
+      </Link>
+      <nav className="flex items-center space-x-6 text-gray-700">
+        <Link href="/" className="hover:text-pink-500">Home</Link>
+        <Link href="/cart" className="relative hover:text-pink-500 flex items-center">
+          <ShoppingCartIcon className="h-6 w-6" />
+          {itemCount > 0 && (
+            <span className="absolute -top-2 -right-3 text-xs bg-pink-500 text-white px-1.5 py-0.5 rounded-full">
+              {itemCount}
+            </span>
+          )}
+        </Link>
+        <Link href="/login" className="hover:text-pink-500">Login</Link>
+        <Link href="/register" className="hover:text-pink-500">Register</Link>
       </nav>
     </header>
   )

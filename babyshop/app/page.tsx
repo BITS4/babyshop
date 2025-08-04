@@ -1,31 +1,32 @@
 import Navbar from "@/components/Navbar"
-import HeroSection from "@/components/HeroSection"
-import ProductCard from "@/components/ProductCard"
+import HeroSection from "../components/HeroSection"
+import ProductCard from "../components/ProductCard"
+import CartPreview from "../components/CartPreview"
 
 const products = [
   {
     id: 1,
     name: "Fluffy Onesie",
     price: "$29.99",
-    image: "https://via.placeholder.com/150"
+    image: "/images/onesie.jpeg"
   },
   {
     id: 2,
     name: "Tiny Socks Pack",
     price: "$9.99",
-    image: "https://via.placeholder.com/150"
+    image: "/images/socks.jpeg"
   },
   {
     id: 3,
     name: "Mini Hoodie",
     price: "$34.99",
-    image: "https://via.placeholder.com/150"
+    image: "/images/hoodie.jpeg"
   },
   {
     id: 4,
     name: "Cute Pajamas",
     price: "$24.99",
-    image: "https://via.placeholder.com/150"
+    image: "/images/pajamas.jpeg"
   },
 ]
 
@@ -42,6 +43,10 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      {/* Cart display */}
+      <CartPreview />
     </main>
   )
 }
+
