@@ -8,7 +8,7 @@ import Image from "next/image"
 import type { Product } from "@/components/ProductCard"
 import { useEffect } from "react"
 export default function AdminPage() {
-  const { user } = useAuth()
+  const { user, isLoading } = useAuth()
   const router = useRouter()
   const { addProduct, products, deleteProduct, setProducts } = useProducts()
 
@@ -20,12 +20,12 @@ export default function AdminPage() {
   const [editId, setEditId] = useState<number | null>(null)
 
   useEffect(() => {
-    if (!user) {
+    if (!isLoading && !user) {
       router.push("/login")
     }
   }, [user])
 
-  if (!user) return null
+  if (!user || isLoading) return null
 
 
 const handleSubmit = async (e: React.FormEvent) => {
@@ -90,6 +90,14 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   return (
     <div className="min-h-screen bg-pink-50 py-10 px-4">
+      <div className="text-center mb-6">
+        <a
+          href="/admin/orders"
+          className="text-pink-600 underline hover:text-pink-800"
+        >
+          View Orders
+        </a>
+      </div>
       <form
         onSubmit={handleSubmit}
         className="bg-white p-6 rounded shadow-md w-full max-w-md mx-auto space-y-4 mb-10"

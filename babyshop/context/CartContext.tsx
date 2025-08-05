@@ -7,6 +7,7 @@ type CartItem = Product & { quantity: number }
 type CartContextType = {
   cart: CartItem[]
   addToCart: (product: Product) => void
+  clearCart: () => void
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
@@ -38,7 +39,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <CartContext.Provider value={{ cart, addToCart }}>
+    <CartContext.Provider value={{ cart, addToCart, clearCart: () => setCart([]) }}>
       {children}
     </CartContext.Provider>
   )

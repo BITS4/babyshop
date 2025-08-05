@@ -7,6 +7,7 @@ type AuthContextType = {
   login: (email: string, password: string) => boolean
   logout: () => void
   register: (email: string, password: string) => void
+  isLoading: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -14,6 +15,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<string | null>(null)
   const [registeredUser, setRegisteredUser] = useState<{ email: string; password: string } | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const savedUser = localStorage.getItem("user")
@@ -21,6 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const savedReg = localStorage.getItem("registeredUser")
     if (savedReg) setRegisteredUser(JSON.parse(savedReg))
+    setIsLoading(false)
   }, [])
 
   useEffect(() => {
@@ -49,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => setUser(null)
 
   return (
-    <AuthContext.Provider value={{ user, registeredUser, login, logout, register }}>
+    <AuthContext.Provider value={{ user, registeredUser, login, logout, register, isLoading }}>
       {children}
     </AuthContext.Provider>
   )
