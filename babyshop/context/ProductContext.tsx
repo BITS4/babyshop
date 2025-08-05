@@ -5,6 +5,8 @@ import type { Product } from "../components/ProductCard"
 type ProductContextType = {
   products: Product[]
   addProduct: (product: Omit<Product, "id">) => void
+  deleteProduct: (id: number) => void
+  setProducts: React.Dispatch<React.SetStateAction<Product[]>>
 }
 
 const ProductContext = createContext<ProductContextType | undefined>(undefined)
@@ -44,9 +46,13 @@ export function ProductProvider({ children }: { children: ReactNode }) {
   const addProduct = (product: Omit<Product, "id">) => {
     setProducts(prev => [...prev, { ...product, id: Date.now() }])
   }
+  const deleteProduct = (id: number) => {
+    setProducts(prev => prev.filter(p => p.id !== id))
+  }
+
 
   return (
-    <ProductContext.Provider value={{ products, addProduct }}>
+    <ProductContext.Provider value={{ products, addProduct, deleteProduct, setProducts }}>
       {children}
     </ProductContext.Provider>
   )
