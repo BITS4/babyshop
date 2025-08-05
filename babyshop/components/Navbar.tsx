@@ -27,7 +27,8 @@ export default function Navbar() {
         </Link>
         {user && (
           <>
-            <Link href="/admin" className="hover:text-pink-500">My page</Link>
+            <Link href="/admin" className="hover:text-pink-500">Admin</Link>
+            <Link href="/profile" className="hover:text-pink-500">My Page</Link>
             <Link href="/admin/orders" className="hover:text-pink-500">Orders</Link>
           </>
         )}
