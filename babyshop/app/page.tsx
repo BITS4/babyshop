@@ -1,7 +1,10 @@
+"use client"
+
 import Navbar from "@/components/Navbar"
 import HeroSection from "../components/HeroSection"
 import ProductCard from "../components/ProductCard"
 import CartPreview from "../components/CartPreview"
+import { useProducts } from "../context/ProductContext"
 
 const products = [
   {
@@ -31,6 +34,8 @@ const products = [
 ]
 
 export default function Home() {
+  const { products } = useProducts()
+
   return (
     <main className="min-h-screen bg-pink-50">
       <Navbar />
@@ -43,10 +48,9 @@ export default function Home() {
           ))}
         </div>
       </section>
-
-      {/* Cart display */}
       <CartPreview />
     </main>
   )
 }
+
 
