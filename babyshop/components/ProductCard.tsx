@@ -2,11 +2,12 @@
 import Image from "next/image"
 import { useCart } from "../context/CartContext"
 
-type Product = {
+export type Product = {
   id: number
   name: string
-  price: string
-  image: string
+  description: string
+  price: number
+  image: string 
 }
 
 export default function ProductCard({ product }: { product: Product }) {
@@ -22,7 +23,7 @@ export default function ProductCard({ product }: { product: Product }) {
         className="rounded object-cover"
       />
       <h3 className="mt-2 font-semibold text-lg text-gray-800">{product.name}</h3>
-      <p className="text-pink-600 font-bold">{product.price}</p>
+      <p className="text-pink-600 font-bold">${product.price.toFixed(2)}</p>
       <button
         className="mt-3 bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600 transition"
         onClick={() => addToCart(product)}

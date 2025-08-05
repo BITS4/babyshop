@@ -1,12 +1,6 @@
 "use client"
 import { createContext, useContext, useState, ReactNode, useEffect } from "react"
-
-export type Product = {
-  id: number
-  name: string
-  price: string
-  image: string
-}
+import type { Product } from "../components/ProductCard"
 
 type ProductContextType = {
   products: Product[]
@@ -24,20 +18,22 @@ export function ProductProvider({ children }: { children: ReactNode }) {
     if (saved) {
       setProducts(JSON.parse(saved))
     } else {
-      setProducts([
+        setProducts([
         {
-          id: 1,
-          name: "Fluffy Onesie",
-          price: "$29.99",
-          image: "/images/onesie.jpeg"
+            id: 1,
+            name: "Fluffy Onesie",
+            description: "Soft and cozy onesie for your little one",
+            price: 29.99,
+            image: "/images/onesie.jpeg"
         },
         {
-          id: 2,
-          name: "Tiny Socks Pack",
-          price: "$9.99",
-          image: "/images/socks.jpeg"
+            id: 2,
+            name: "Tiny Socks Pack",
+            description: "Cute and warm socks for babies",
+            price: 9.99,
+            image: "/images/socks.jpeg"
         }
-      ])
+        ])
     }
   }, [])
 
