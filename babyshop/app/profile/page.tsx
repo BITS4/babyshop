@@ -22,6 +22,14 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-pink-50 py-10 px-4 flex justify-center items-center">
+      <div className="w-full max-w-sm">
+          {/* Back Button */}
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="mb-4 text-pink-600 hover:underline flex items-center">
+            ← Back
+          </button>
       <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md text-center space-y-6">
         <Image
           src="/images/avatar-placeholder.png"
@@ -78,6 +86,7 @@ export default function ProfilePage() {
         >
           Logout
         </button>
+      </div>
       </div>
     </div>
   )

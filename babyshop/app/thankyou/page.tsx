@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-
+import { useRouter } from "next/navigation"
 type OrderProduct = {
   id: number
   name: string
@@ -18,7 +18,7 @@ type Order = {
 
 export default function ThankYouPage() {
   const [order, setOrder] = useState<Order | null>(null)
-
+  const router = useRouter()
   useEffect(() => {
     const saved = localStorage.getItem("lastOrder")
     if (saved) {
@@ -39,6 +39,15 @@ export default function ThankYouPage() {
 
   return (
     <div className="min-h-screen bg-pink-50 py-10 px-4">
+      <div className="w-full max-w-sm">
+        {/* Back Button */}
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="mb-4 text-pink-600 hover:underline flex items-center">
+          ← Back
+        </button>
+      </div>
       <h1 className="text-3xl font-bold text-center text-pink-600 mb-6">🎉 Thank You!</h1>
       <p className="text-center text-green-600 font-semibold text-lg mb-4">
         Your order was placed successfully 💖
