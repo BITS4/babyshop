@@ -19,6 +19,7 @@ export default function CartPage() {
           className="mb-4 text-pink-600 hover:underline flex items-center">
           ← Back
         </button>
+      </div>
       <h1 className="text-3xl font-bold text-center text-pink-600 mb-6">Your Cart</h1>
       {cart.length === 0 ? (
         <p className="text-center text-gray-600">
@@ -50,7 +51,6 @@ export default function CartPage() {
           </div>
         </div>
       )}
-      </div>
     </div>
   )
 }

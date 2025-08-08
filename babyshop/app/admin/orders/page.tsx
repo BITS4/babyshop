@@ -20,7 +20,7 @@ export default function OrdersPage() {
     if (storedOrders) {
       const allOrders = JSON.parse(storedOrders)
 
-      if (user === "admin@admin.com") {
+      if (user?.email === "admin@admin.com") {
         // Admin sees all orders
         setOrders(allOrders)
       } else {
