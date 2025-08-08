@@ -10,11 +10,21 @@ export default function RegisterPage() {
 
   const { register } = useAuth()
   const router = useRouter()
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    register(email, password)
-    setRegistered(true)
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault()
+
+  if (password.length < 6) {
+    alert("Password must be at least 6 characters.")
+    return
   }
+
+  try {
+    await register(email, password)
+    setRegistered(true)
+  } catch (err: any) {
+    alert("Registration failed: " + err.message)
+  }
+}
 
   return (
     <div className="min-h-screen bg-pink-50 flex items-center justify-center">

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+
 type OrderProduct = {
   id: number
   name: string
@@ -19,6 +20,7 @@ type Order = {
 export default function ThankYouPage() {
   const [order, setOrder] = useState<Order | null>(null)
   const router = useRouter()
+
   useEffect(() => {
     const saved = localStorage.getItem("lastOrder")
     if (saved) {
@@ -38,22 +40,13 @@ export default function ThankYouPage() {
   }
 
   return (
-    <div className="min-h-screen bg-pink-50 py-10 px-4">
-      <div className="w-full max-w-sm">
-        {/* Back Button */}
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="mb-4 text-pink-600 hover:underline flex items-center">
-          ← Back
-        </button>
-      </div>
-      <h1 className="text-3xl font-bold text-center text-pink-600 mb-6">🎉 Thank You!</h1>
-      <p className="text-center text-green-600 font-semibold text-lg mb-4">
+    <div className="min-h-screen bg-pink-50 py-10 px-4 flex flex-col items-center">
+      <h1 className="text-3xl font-bold text-center text-pink-600 mb-4">🎉 Thank You!</h1>
+      <p className="text-center text-green-600 font-semibold text-lg mb-6">
         Your order was placed successfully 💖
       </p>
 
-      <div className="max-w-2xl mx-auto bg-white p-6 rounded shadow space-y-4">
+      <div className="max-w-2xl w-full bg-white p-6 rounded shadow space-y-4 mb-6">
         <h2 className="text-xl font-bold text-pink-600">Order Summary</h2>
 
         <div>
@@ -79,6 +72,15 @@ export default function ThankYouPage() {
           Total: ${getTotal()}
         </div>
       </div>
+
+      {/* Home Button */}
+      <button
+        type="button"
+        onClick={() => router.push('/')}
+        className="bg-pink-500 text-white px-6 py-2 rounded hover:bg-pink-600"
+      >
+        🏠 Go to Home
+      </button>
     </div>
   )
 }

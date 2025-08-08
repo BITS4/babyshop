@@ -34,7 +34,7 @@ export default function Navbar() {
         )}
         {user ? (
         <>
-            <span className="text-sm text-pink-600">👋 {user}</span>
+            <span className="text-sm text-pink-600">👋 {user.email}</span>
             <button
             onClick={() => {
               logout()
