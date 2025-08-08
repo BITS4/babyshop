@@ -2,14 +2,14 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useAuth } from "../../context/AuthContext"
-
+import { useRouter } from "next/navigation"
 export default function RegisterPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [registered, setRegistered] = useState(false)
 
   const { register } = useAuth()
-
+  const router = useRouter()
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     register(email, password)
@@ -18,6 +18,14 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen bg-pink-50 flex items-center justify-center">
+        <div className="w-full max-w-sm">
+        {/* Back Button */}
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="mb-4 text-pink-600 hover:underline flex items-center">
+          ← Back
+        </button>
       {registered ? (
         <p className="text-green-600 font-bold text-xl text-center">
           ✅ Registration successful! <br /> <Link href="/login" className="underline">Log in now</Link>
@@ -52,6 +60,7 @@ export default function RegisterPage() {
           </p>
         </form>
       )}
+      </div>
     </div>
   )
 }

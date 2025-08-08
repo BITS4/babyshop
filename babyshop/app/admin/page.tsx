@@ -90,6 +90,15 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   return (
     <div className="min-h-screen bg-pink-50 py-10 px-4">
+      <div className="w-full max-w-sm">
+        {/* Back Button */}
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="mb-4 text-pink-600 hover:underline flex items-center">
+          ← Back
+        </button>
+      </div>
       <div className="text-center mb-6">
         <a
           href="/admin/orders"

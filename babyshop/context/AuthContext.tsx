@@ -8,6 +8,7 @@ type AuthContextType = {
   logout: () => void
   register: (email: string, password: string) => void
   isLoading: boolean
+  changePassword: (newPassword: string) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -51,8 +52,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => setUser(null)
 
+  const changePassword = (newPassword: string) => {
+    if (user && registeredUser && registeredUser.email === user) {
+      const updatedUser = { ...registeredUser, password: newPassword }
+      setRegisteredUser(updatedUser)
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, registeredUser, login, logout, register, isLoading }}>
+    <AuthContext.Provider value={{ user, registeredUser, login, logout, register, isLoading, changePassword }}>
       {children}
     </AuthContext.Provider>
   )

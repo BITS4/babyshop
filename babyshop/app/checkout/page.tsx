@@ -44,6 +44,14 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-pink-50 py-10 px-4">
+        <div className="w-full max-w-sm">
+          {/* Back Button */}
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="mb-4 text-pink-600 hover:underline flex items-center">
+            ← Back
+          </button>
       <h1 className="text-3xl font-bold text-center text-pink-600 mb-6">Checkout</h1>
       <form onSubmit={handleSubmit} className="max-w-md mx-auto bg-white p-6 rounded shadow space-y-4">
         <div>
@@ -72,6 +80,7 @@ export default function CheckoutPage() {
           Place Order
         </button>
       </form>
+      </div>
     </div>
   )
 }

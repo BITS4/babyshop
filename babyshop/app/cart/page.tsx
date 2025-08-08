@@ -1,15 +1,24 @@
 "use client"
 import { useCart } from "../../context/CartContext"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 export default function CartPage() {
   const { cart } = useCart()
-
+  const router = useRouter()
   const getTotal = () =>
     cart.reduce((acc, item) => acc + item.price * item.quantity, 0).toFixed(2)
 
   return (
     <div className="min-h-screen bg-pink-50 py-10 px-4">
+      <div className="w-full max-w-sm">
+        {/* Back Button */}
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="mb-4 text-pink-600 hover:underline flex items-center">
+          ← Back
+        </button>
       <h1 className="text-3xl font-bold text-center text-pink-600 mb-6">Your Cart</h1>
       {cart.length === 0 ? (
         <p className="text-center text-gray-600">
@@ -41,6 +50,7 @@ export default function CartPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }

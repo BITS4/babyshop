@@ -35,6 +35,15 @@ export default function OrdersPage() {
 
   return (
     <div className="min-h-screen bg-pink-50 py-10 px-4">
+      <div className="w-full max-w-sm">
+        {/* Back Button */}
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="mb-4 text-pink-600 hover:underline flex items-center">
+          ← Back
+        </button>
+      </div>
       <h1 className="text-3xl font-bold text-center text-pink-600 mb-6">Orders</h1>
       {orders.length === 0 ? (
         <p className="text-center text-gray-600">No orders yet.</p>
