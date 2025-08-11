@@ -1,66 +1,79 @@
 "use client"
 import { createContext, useContext, useEffect, useState, ReactNode } from "react"
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  sendEmailVerification,
+  GoogleAuthProvider,
+  signInWithPopup,
+  User,
+} from "firebase/auth"
+import { auth } from "@/app/firebase"
 
 type AuthContextType = {
-  user: string | null
-  registeredUser: { email: string; password: string } | null
-  login: (email: string, password: string) => boolean
-  logout: () => void
-  register: (email: string, password: string) => void
+  user: User | null
+  isVerified: boolean
   isLoading: boolean
-  changePassword: (newPassword: string) => void
+  login: (email: string, password: string) => Promise<void>
+  register: (email: string, password: string) => Promise<void>
+  loginWithGoogle: () => Promise<void>
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<string | null>(null)
-  const [registeredUser, setRegisteredUser] = useState<{ email: string; password: string } | null>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const savedUser = localStorage.getItem("user")
-    if (savedUser) setUser(savedUser)
-
-    const savedReg = localStorage.getItem("registeredUser")
-    if (savedReg) setRegisteredUser(JSON.parse(savedReg))
-    setIsLoading(false)
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser)
+      setIsLoading(false)
+    })
+    return () => unsubscribe()
   }, [])
 
-  useEffect(() => {
-    localStorage.setItem("user", user ?? "")
-  }, [user])
-
-  useEffect(() => {
-    if (registeredUser) {
-      localStorage.setItem("registeredUser", JSON.stringify(registeredUser))
-    }
-  }, [registeredUser])
-
-  const login = (email: string, password: string) => {
-    if (registeredUser && email === registeredUser.email && password === registeredUser.password) {
-      setUser(email)
-      return true
-    } else {
-      return false
+  const login = async (email: string, password: string) => {
+    const result = await signInWithEmailAndPassword(auth, email, password)
+    if (!result.user.emailVerified) {
+      await sendEmailVerification(result.user)
+      throw new Error("Please verify your email. We've sent a link.")
     }
   }
 
-  const register = (email: string, password: string) => {
-    setRegisteredUser({ email, password })
+  const register = async (email: string, password: string) => {
+    if (!email.endsWith("@gmail.com")) {
+      throw new Error("Only Gmail addresses are allowed.")
+    }
+
+    const result = await createUserWithEmailAndPassword(auth, email, password)
+    await sendEmailVerification(result.user)
   }
 
-  const logout = () => setUser(null)
+  const loginWithGoogle = async () => {
+    const provider = new GoogleAuthProvider()
+    await signInWithPopup(auth, provider)
+  }
 
-  const changePassword = (newPassword: string) => {
-    if (user && registeredUser && registeredUser.email === user) {
-      const updatedUser = { ...registeredUser, password: newPassword }
-      setRegisteredUser(updatedUser)
-    }
+  const logout = async () => {
+    await signOut(auth)
   }
 
   return (
-    <AuthContext.Provider value={{ user, registeredUser, login, logout, register, isLoading, changePassword }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isVerified: !!user?.emailVerified,
+        isLoading,
+        login,
+        register,
+        loginWithGoogle,
+        logout
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )

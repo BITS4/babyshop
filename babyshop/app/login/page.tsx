@@ -12,13 +12,13 @@ export default function LoginPage() {
   const router = useRouter()
   const { login } = useAuth()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const success = login(email, password)
-    if (success) {
+    try {
+      await login(email, password)
       router.push("/")
-    } else {
-      setError("Invalid email or password")
+    } catch (err: any) {
+      setError(err.message || "Login failed")
     }
   }
 

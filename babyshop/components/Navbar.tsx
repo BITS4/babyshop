@@ -15,8 +15,10 @@ export default function Navbar() {
       <Link href="/">
         <h1 className="text-2xl font-bold text-pink-500">BabyShop</h1>
       </Link>
+
       <nav className="flex items-center space-x-6 text-gray-700">
         <Link href="/" className="hover:text-pink-500">Home</Link>
+
         <Link href="/cart" className="relative hover:text-pink-500 flex items-center">
           <ShoppingCartIcon className="h-6 w-6" />
           {itemCount > 0 && (
@@ -25,6 +27,7 @@ export default function Navbar() {
             </span>
           )}
         </Link>
+
         {user && (
           <>
             <Link href="/admin" className="hover:text-pink-500">Admin</Link>
@@ -32,24 +35,25 @@ export default function Navbar() {
             <Link href="/admin/orders" className="hover:text-pink-500">Orders</Link>
           </>
         )}
+
         {user ? (
-        <>
-            <span className="text-sm text-pink-600">👋 {user}</span>
+          <>
+            <span className="text-sm text-pink-600">👋 {user.email ?? "User"}</span>
             <button
-            onClick={() => {
-              logout()
-              location.href = "/"
-            }}
-            className="text-sm text-red-500 hover:underline"
+              onClick={() => {
+                logout()
+                location.href = "/"
+              }}
+              className="text-sm text-red-500 hover:underline"
             >
-            Logout
+              Logout
             </button>
-        </>
+          </>
         ) : (
-        <>
+          <>
             <Link href="/login" className="hover:text-pink-500">Login</Link>
             <Link href="/register" className="hover:text-pink-500">Register</Link>
-        </>
+          </>
         )}
       </nav>
     </header>

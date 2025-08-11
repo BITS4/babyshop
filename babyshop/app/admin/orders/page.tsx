@@ -20,12 +20,12 @@ export default function OrdersPage() {
     if (storedOrders) {
       const allOrders = JSON.parse(storedOrders)
 
-      if (user === "admin@admin.com") {
+      if (user?.email === "admin@admin.com") {
         // Admin sees all orders
         setOrders(allOrders)
       } else {
         // Regular user sees only their orders
-        const userOrders = allOrders.filter((order: any) => order.email === user)
+        const userOrders = allOrders.filter((order: any) => order.email === user?.email)
         setOrders(userOrders)
       }
     }
