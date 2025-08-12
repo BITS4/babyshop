@@ -39,10 +39,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const result = await signInWithEmailAndPassword(auth, email, password)
     if (!result.user.emailVerified) {
-      await sendEmailVerification(result.user)
-      throw new Error("Please verify your email. We've sent a link.")
+      throw new Error("Please verify your email. Check your inbox.")
     }
   }
+
 
   const register = async (email: string, password: string) => {
     if (!email.endsWith("@gmail.com")) {

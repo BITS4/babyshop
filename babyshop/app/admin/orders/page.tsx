@@ -16,20 +16,39 @@ export default function OrdersPage() {
   }, [user, isLoading])
 
   useEffect(() => {
-    const storedOrders = localStorage.getItem("orders")
-    if (storedOrders) {
-      const allOrders = JSON.parse(storedOrders)
+    if (!user) return
+    const raw = localStorage.getItem("orders")
+    if (!raw) { setOrders([]); return }
 
-      if (user?.email === "admin@admin.com") {
-        // Admin sees all orders
-        setOrders(allOrders)
-      } else {
-        // Regular user sees only their orders
-        const userOrders = allOrders.filter((order: any) => order.email === user?.email)
-        setOrders(userOrders)
-      }
+    try {
+      const parsed = JSON.parse(raw)
+      const allOrders: any[] = Array.isArray(parsed) ? parsed : Object.values(parsed ?? {})
+
+      const pickEmail = (o: any) =>
+        typeof o?.email === "string" ? o.email
+        : (typeof o?.email === "object" && typeof o?.email?.email === "string" ? o.email.email
+        : (o?.userEmail ?? o?.contact?.email ?? ""))
+
+      const userEmail = String(user?.email || "").toLowerCase()
+
+      const visible = userEmail === "admin@admin.com"
+        ? allOrders
+        : allOrders.filter(o => String(pickEmail(o)).toLowerCase() === userEmail)
+
+      const normalized = visible.map(o => ({
+        ...o,
+        email: pickEmail(o),
+        timestamp: o.timestamp ?? o.createdAt ?? Date.now(),
+        items: Array.isArray(o.items) ? o.items : []
+      }))
+
+      setOrders(normalized)
+    } catch (e) {
+      console.error("Failed to parse orders from localStorage", e)
+      setOrders([])
     }
   }, [user])
+
 
   if (isLoading || !user) return null
 
@@ -40,7 +59,7 @@ export default function OrdersPage() {
         <button
           type="button"
           onClick={() => router.back()}
-          className="mb-4 text-pink-600 hover:underline flex items-center">
+          className="mb-4 text-pink-600 hover:underline flex items-center">      
           ← Back
         </button>
       </div>
