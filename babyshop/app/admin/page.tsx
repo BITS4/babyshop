@@ -1,15 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import Image from "next/image"
+import { useRouter } from "next/navigation"
 import { useProducts } from "../../context/ProductContext"
 import { useAuth } from "../../context/AuthContext"
-import { useRouter } from "next/navigation"
-import Image from "next/image"
 import type { Product } from "@/components/ProductCard"
-import { useEffect } from "react"
+
 export default function AdminPage() {
-  const { user, isLoading } = useAuth()
   const router = useRouter()
+  const { user, isLoading } = useAuth()
   const { addProduct, products, deleteProduct, setProducts } = useProducts()
 
   const [name, setName] = useState("")
@@ -19,65 +19,77 @@ export default function AdminPage() {
   const [isEditing, setIsEditing] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
 
+  // redirect if not logged in
   useEffect(() => {
     if (!isLoading && !user) {
       router.push("/login")
     }
-  }, [user])
+  }, [user, isLoading, router])
 
   if (!user || isLoading) return null
 
+  // soft-check an image URL without blocking saves (CDNs often block HEAD/GET)
+  const softCheckImageUrl = async (url: string) => {
+    try {
+      // allow local /images/... paths and data: URLs without fetch checks
+      const isLocal = url.startsWith("/") || url.startsWith("data:")
+      if (isLocal) return
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault()
-
-  if (!name || price === "" || !image) return
-
-  const numericPrice = price
-  if (isNaN(numericPrice)) {
-    alert("❌ Price must be a valid number.")
-    return
+      // opaque due to no-cors; errors only if truly unreachable
+      await fetch(url, { method: "GET", mode: "no-cors" })
+    } catch {
+      // ignore — do not block submission
+    }
   }
 
-  try {
-    const response = await fetch(image, { method: "HEAD" })
-    if (!response.ok) {
-      alert("❌ Invalid image URL. Please check the link and try again.")
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!name.trim() || price === "" || !image.trim() || !description.trim()) {
+      alert("❌ Please fill in all fields.")
       return
     }
 
-    if (isEditing && editId !== null) {
-      const updatedProduct = {
-        id: editId,
-        name,
-        description,
-        price: numericPrice,
-        image,
-      }
-      const updatedList = products.map(p => (p.id === editId ? updatedProduct : p))
-      localStorage.setItem("products", JSON.stringify(updatedList))
-      setProducts(updatedList) 
-    } else {
-      addProduct({
-        name,
-        description,
-        price: numericPrice,
-        image,
-      })
+    const numericPrice = typeof price === "number" ? price : parseFloat(price as unknown as string)
+    if (Number.isNaN(numericPrice) || numericPrice < 0) {
+      alert("❌ Price must be a valid non‑negative number.")
+      return
     }
 
-    alert("✅ Product saved successfully!")
+    // best-effort image URL check (non-blocking)
+    await softCheckImageUrl(image.trim())
+
+    if (isEditing && editId !== null) {
+      const updatedProduct: Product = {
+        id: editId,
+        name: name.trim(),
+        description: description.trim(),
+        price: numericPrice,
+        image: image.trim(),
+      }
+      const updatedList = products.map(p => (p.id === editId ? updatedProduct : p))
+      // keep storage in sync for your context’s current approach
+      localStorage.setItem("products", JSON.stringify(updatedList))
+      setProducts(updatedList)
+      alert("✅ Product updated.")
+    } else {
+      addProduct({
+        name: name.trim(),
+        description: description.trim(),
+        price: numericPrice,
+        image: image.trim(),
+      })
+      alert("✅ Product added.")
+    }
+
+    // reset form
     setName("")
     setPrice("")
     setImage("")
     setDescription("")
     setEditId(null)
     setIsEditing(false)
-  } catch (err) {
-    alert("❌ Error verifying image URL. Please try another one.")
   }
-}
-
 
   const handleEditClick = (product: Product) => {
     setIsEditing(true)
@@ -95,23 +107,25 @@ const handleSubmit = async (e: React.FormEvent) => {
         <button
           type="button"
           onClick={() => router.back()}
-          className="mb-4 text-pink-600 hover:underline flex items-center">
+          className="mb-4 text-pink-600 hover:underline flex items-center"
+        >
           ← Back
         </button>
       </div>
+
       <div className="text-center mb-6">
-        <a
-          href="/admin/orders"
-          className="text-pink-600 underline hover:text-pink-800"
-        >
+        <a href="/admin/orders" className="text-pink-600 underline hover:text-pink-800">
           View Orders
         </a>
       </div>
+
       <form
         onSubmit={handleSubmit}
         className="bg-white p-6 rounded shadow-md w-full max-w-md mx-auto space-y-4 mb-10"
       >
-        <h1 className="text-2xl font-bold text-pink-600 text-center">Admin – Add Product</h1>
+        <h1 className="text-2xl font-bold text-pink-600 text-center">
+          Admin – Add Product
+        </h1>
 
         <input
           type="text"
@@ -128,6 +142,8 @@ const handleSubmit = async (e: React.FormEvent) => {
           value={price}
           onChange={e => setPrice(e.target.value === "" ? "" : parseFloat(e.target.value))}
           className="w-full border px-3 py-2 rounded"
+          step="0.01"
+          min="0"
           required
         />
 
@@ -142,7 +158,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
         <input
           type="text"
-          placeholder="Image URL (e.g. /images/new.jpeg)"
+          placeholder="Image URL (e.g. /images/new.jpeg or https://...)"
           value={image}
           onChange={e => setImage(e.target.value)}
           className="w-full border px-3 py-2 rounded"
@@ -155,10 +171,9 @@ const handleSubmit = async (e: React.FormEvent) => {
         >
           {isEditing ? "Update Product" : "Add Product"}
         </button>
-
       </form>
 
-      {/* Product List with Delete Button */}
+      {/* Product List with Delete & Edit */}
       <div className="max-w-4xl mx-auto space-y-4">
         <h2 className="text-xl font-bold text-center text-pink-600 mb-4">Product List</h2>
         {products.length === 0 ? (
@@ -177,12 +192,14 @@ const handleSubmit = async (e: React.FormEvent) => {
                 <h3 className="mt-2 font-semibold text-lg text-gray-800">{product.name}</h3>
                 <p className="text-sm text-gray-500">{product.description}</p>
                 <p className="font-bold text-pink-600 mt-1">${product.price.toFixed(2)}</p>
-                  <button
-                    onClick={() => handleEditClick(product)}
-                    className="mt-2 text-sm text-blue-500 underline hover:text-blue-700"
-                  >
-                    Edit
-                  </button>
+
+                <button
+                  onClick={() => handleEditClick(product)}
+                  className="mt-2 text-sm text-blue-500 underline hover:text-blue-700"
+                >
+                  Edit
+                </button>
+
                 <button
                   onClick={() => {
                     if (confirm(`Are you sure you want to delete "${product.name}"?`)) {

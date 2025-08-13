@@ -42,42 +42,53 @@ export default function CheckoutPage() {
   }, [user?.uid])
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
     if (!user?.email) {
-      alert("Please log in first.")
-      router.push("/login")
-      return
+      alert("Please log in first.");
+      router.push("/login");
+      return;
     }
     if (!name.trim() || !address.trim()) {
-      alert("❌ Please fill in all fields.")
-      return
+      alert("❌ Please fill in all fields.");
+      return;
     }
     if (cart.length === 0) {
-      alert("❌ Your cart is empty.")
-      return
+      alert("❌ Your cart is empty.");
+      return;
     }
 
     const orderData = {
       name: name.trim(),
-      email: user.email,          // save email as string
+      email: user.email,
       address: address.trim(),
       items: [...cart],
       timestamp: new Date().toISOString(),
+    };
+
+    try {
+      // 1) Save to Firestore (may fail if rules/permissions wrong)
+      await addDoc(collection(db, "orders"), {
+        userId: user.uid,
+        email: user.email,
+        name: orderData.name,
+        address: orderData.address,
+        items: orderData.items,
+        createdAt: serverTimestamp(),
+      });
+
+      // 2) Persist to localStorage so /thankyou can read it
+      localStorage.setItem("lastOrder", JSON.stringify(orderData));
+
+      // 3) Clear cart and go to thank-you page
+      clearCart();
+      router.push("/thankyou");
+    } catch (err: any) {
+      console.error("Order submission failed:", err);
+      alert(`Order failed: ${err?.message ?? "Unknown error"}`);
     }
+  };
 
-    await addDoc(collection(db, "orders"), {
-      userId: user.uid,
-      email: user.email,
-      name: orderData.name,
-      address: orderData.address,
-      items: orderData.items,
-      createdAt: serverTimestamp()
-    })
-
-    clearCart()
-    router.push("/thankyou")
-  }
 
   if (loadingProfile) {
     return (
