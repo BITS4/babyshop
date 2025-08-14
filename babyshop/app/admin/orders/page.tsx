@@ -19,10 +19,10 @@ type OrderDoc = {
   name: string
   email: string
   address: string
-  phone?: string            // NEW
+  phone?: string
   items: OrderItem[]
   createdAt?: Timestamp | null
-  timestamp?: string        // fallback ISO string for older localStorage format
+  timestamp?: string
 }
 
 export default function OrdersPage() {
@@ -31,7 +31,7 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderDoc[]>([])
   const [loadingOrders, setLoadingOrders] = useState(true)
 
-  // Kick to login if not signed in
+  // redirect if not signed in
   useEffect(() => {
     if (!isLoading && !user) router.push("/login")
   }, [user, isLoading, router])
@@ -47,7 +47,7 @@ export default function OrdersPage() {
         let docs: any[] = []
 
         if (isAdmin) {
-          // Admin: try to order by createdAt desc; fall back to unordered if missing index
+          // admin: prefer createdAt desc, fallback to unordered if index missing
           try {
             const snap = await getDocs(query(colRef, orderBy("createdAt", "desc")))
             docs = snap.docs
@@ -56,7 +56,7 @@ export default function OrdersPage() {
             docs = snap.docs
           }
         } else {
-          // Normal user: query by userId (preferred), then by email, then filter all as last resort
+          // user: by userId then by email then filter all
           let snap
           try {
             snap = await getDocs(query(colRef, where("userId", "==", user.uid), orderBy("createdAt", "desc")))
@@ -80,26 +80,34 @@ export default function OrdersPage() {
           }
         }
 
-        const list: OrderDoc[] = docs.map(d => {
-          const data = d.data() as any
-          return {
-            id: d.id,
-            name: data.name ?? "",
-            email: data.email ?? "",
-            address: data.address ?? "",
-            phone: (data.phone ?? "").toString(), // NEW
-            items: Array.isArray(data.items) ? data.items : [],
-            createdAt: data.createdAt ?? null,
-            timestamp: data.timestamp ?? null,
-          }
-        }).sort((a, b) => {
-          const ta = a.createdAt?.toMillis?.() ?? (a.timestamp ? new Date(a.timestamp).getTime() : 0)
-          const tb = b.createdAt?.toMillis?.() ?? (b.timestamp ? new Date(b.timestamp).getTime() : 0)
-          return tb - ta
-        })
+        const list: OrderDoc[] = docs
+          .map(d => {
+            const data = d.data() as any
+            return {
+              id: d.id,
+              name: (data?.name ?? "").toString(),
+              email: (data?.email ?? "").toString(),
+              address: (data?.address ?? "").toString(),
+              phone: data?.phone ? String(data.phone) : undefined,
+              items: Array.isArray(data?.items) ? data.items : [],
+              createdAt: data?.createdAt ?? null,
+              timestamp: data?.timestamp ?? null,
+            }
+          })
+          .sort((a, b) => {
+            const aMs =
+              (a.createdAt && typeof (a.createdAt as any).toMillis === "function"
+                ? (a.createdAt as any).toMillis()
+                : a.timestamp ? new Date(a.timestamp).getTime() : 0)
+            const bMs =
+              (b.createdAt && typeof (b.createdAt as any).toMillis === "function"
+                ? (b.createdAt as any).toMillis()
+                : b.timestamp ? new Date(b.timestamp).getTime() : 0)
+            return bMs - aMs
+          })
 
         setOrders(list)
-      } catch (e: any) {
+      } catch (e) {
         console.error("Failed to load orders:", e)
         setOrders([])
       } finally {
@@ -111,7 +119,8 @@ export default function OrdersPage() {
   }, [user?.uid, user?.email])
 
   const fmtDate = (o: OrderDoc) => {
-    if (o.createdAt && (o.createdAt as any).toDate) return (o.createdAt as any).toDate().toLocaleString()
+    const ts: any = o.createdAt
+    if (ts && typeof ts.toDate === "function") return ts.toDate().toLocaleString()
     if (o.timestamp) return new Date(o.timestamp).toLocaleString()
     return ""
   }
@@ -143,8 +152,9 @@ export default function OrdersPage() {
               <p><strong>Name:</strong> {order.name}</p>
               <p><strong>Email:</strong> {order.email}</p>
               <p><strong>Address:</strong> {order.address}</p>
+              {/* Phone */}
               {order.phone ? (
-                <p><strong>Phone:</strong> {order.phone}</p>   // NEW
+                <p><strong>Phone:</strong> {order.phone}</p>
               ) : (
                 <p className="text-sm text-gray-500"><strong>Phone:</strong> —</p>
               )}
@@ -154,7 +164,7 @@ export default function OrdersPage() {
               <div className="mt-2">
                 <strong>Items:</strong>
                 <ul className="list-disc list-inside">
-                  {order.items.map((item, i) => (
+                  {(order.items || []).map((item, i) => (
                     <li key={i}>{item.name} × {item.quantity}</li>
                   ))}
                 </ul>

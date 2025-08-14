@@ -5,8 +5,7 @@ import { useCart } from "../../context/CartContext"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/context/AuthContext"
 import { db } from "@/app/firebase"
-import { doc, getDoc } from "firebase/firestore"
-import { addDoc, collection, serverTimestamp } from "firebase/firestore"
+import { doc, getDoc, addDoc, collection, serverTimestamp } from "firebase/firestore"
 
 export default function CheckoutPage() {
   const { cart, clearCart } = useCart()
@@ -15,9 +14,10 @@ export default function CheckoutPage() {
 
   const [name, setName] = useState("")
   const [address, setAddress] = useState("")
-  const [phone, setPhone] = useState("")            // NEW
+  const [phone, setPhone] = useState("")
   const [nameLocked, setNameLocked] = useState(false)
   const [loadingProfile, setLoadingProfile] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
 
   // Load profile from Firestore and prefill fields
   useEffect(() => {
@@ -29,10 +29,10 @@ export default function CheckoutPage() {
           const data = snap.data() as { name?: string; address?: string; phone?: string }
           if (data?.name) {
             setName(data.name)
-            setNameLocked(true) // make name uneditable if saved
+            setNameLocked(true) // lock name if saved
           }
-          if (data?.address) setAddress(data.address) // editable but prefilled
-          if (data?.phone) setPhone(String(data.phone).replace(/\D/g, "")) // editable even if prefilled
+          if (data?.address) setAddress(data.address)
+          if (data?.phone) setPhone(String(data.phone).replace(/\D/g, ""))
         }
       } catch (e) {
         console.error("Failed to load profile for checkout:", e)
@@ -44,21 +44,21 @@ export default function CheckoutPage() {
   }, [user?.uid])
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault()
+    if (submitting) return
 
     if (!user?.email) {
-      alert("Please log in first.");
-      router.push("/login");
-      return;
+      alert("Please log in first.")
+      router.push("/login")
+      return
     }
     if (!name.trim() || !address.trim()) {
-      alert("❌ Please fill in all fields.");
-      return;
+      alert("❌ Please fill in all fields.")
+      return
     }
-    // Phone required; digits only; 8–15
     const digits = phone.replace(/\D/g, "")
     if (!digits) {
-      alert("❌ Please enter your phone number.");
+      alert("❌ Please enter your phone number.")
       return
     }
     if (digits.length < 8 || digits.length > 15) {
@@ -66,42 +66,46 @@ export default function CheckoutPage() {
       return
     }
     if (cart.length === 0) {
-      alert("❌ Your cart is empty.");
-      return;
+      alert("❌ Your cart is empty.")
+      return
     }
 
     const orderData = {
       name: name.trim(),
-      email: user.email,
+      email: user.email!,
       address: address.trim(),
-      phone: digits,                // NEW
+      phone: digits,
       items: [...cart],
       timestamp: new Date().toISOString(),
-    };
+    }
 
     try {
-      // 1) Save to Firestore
+      setSubmitting(true)
+
+      // Save to Firestore
       await addDoc(collection(db, "orders"), {
         userId: user.uid,
-        email: user.email,
+        email: orderData.email,
         name: orderData.name,
         address: orderData.address,
-        phone: orderData.phone,     // NEW
+        phone: orderData.phone,
         items: orderData.items,
         createdAt: serverTimestamp(),
-      });
+      })
 
-      // 2) Persist to localStorage so /thankyou can read it
-      localStorage.setItem("lastOrder", JSON.stringify(orderData));
+      // Persist to localStorage for /thankyou
+      localStorage.setItem("lastOrder", JSON.stringify(orderData))
 
-      // 3) Clear cart and go to thank-you page
-      clearCart();
-      router.push("/thankyou");
+      // Clear cart and go to thank-you page
+      clearCart()
+      router.push("/thankyou")
     } catch (err: any) {
-      console.error("Order submission failed:", err);
-      alert(`Order failed: ${err?.message ?? "Unknown error"}`);
+      console.error("Order submission failed:", err)
+      alert(`Order failed: ${err?.message ?? "Unknown error"}`)
+    } finally {
+      setSubmitting(false)
     }
-  };
+  }
 
   if (loadingProfile) {
     return (
@@ -114,7 +118,6 @@ export default function CheckoutPage() {
   return (
     <div className="min-h-screen bg-pink-50 py-10 px-4">
       <div className="w-full max-w-sm">
-        {/* Back Button */}
         <button
           type="button"
           onClick={() => router.back()}
@@ -186,9 +189,10 @@ export default function CheckoutPage() {
 
         <button
           type="submit"
-          className="w-full bg-pink-500 text-white py-2 rounded hover:bg-pink-600 transition"
+          disabled={submitting}
+          className="w-full bg-pink-500 text-white py-2 rounded hover:bg-pink-600 transition disabled:opacity-60"
         >
-          Place Order
+          {submitting ? "Placing Order…" : "Place Order"}
         </button>
       </form>
     </div>
