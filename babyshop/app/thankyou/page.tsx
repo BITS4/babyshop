@@ -14,7 +14,9 @@ type Order = {
   name: string
   email: string
   address: string
+  phone?: string            // NEW
   items: OrderProduct[]
+  timestamp?: string
 }
 
 export default function ThankYouPage() {
@@ -24,12 +26,19 @@ export default function ThankYouPage() {
   useEffect(() => {
     const saved = localStorage.getItem("lastOrder")
     if (saved) {
-      setOrder(JSON.parse(saved))
+      try {
+        setOrder(JSON.parse(saved) as Order)
+      } catch {
+        setOrder(null)
+      }
     }
   }, [])
 
-  const getTotal = () =>
-    order?.items.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2)
+  const getTotal = () => {
+    if (!order?.items?.length) return "0.00"
+    const sum = order.items.reduce((acc, item) => acc + item.price * item.quantity, 0)
+    return sum.toFixed(2)
+  }
 
   if (!order) {
     return (
@@ -49,10 +58,11 @@ export default function ThankYouPage() {
       <div className="max-w-2xl w-full bg-white p-6 rounded shadow space-y-4 mb-6">
         <h2 className="text-xl font-bold text-pink-600">Order Summary</h2>
 
-        <div>
+        <div className="space-y-1">
           <p><strong>Name:</strong> {order.name}</p>
           <p><strong>Email:</strong> {order.email}</p>
           <p><strong>Address:</strong> {order.address}</p>
+          <p><strong>Phone:</strong> {order.phone ? order.phone : <span className="text-gray-500">—</span>}</p>
         </div>
 
         <div>
@@ -73,7 +83,6 @@ export default function ThankYouPage() {
         </div>
       </div>
 
-      {/* Home Button */}
       <button
         type="button"
         onClick={() => router.push('/')}

@@ -19,9 +19,10 @@ type OrderDoc = {
   name: string
   email: string
   address: string
+  phone?: string            // NEW
   items: OrderItem[]
   createdAt?: Timestamp | null
-  timestamp?: string // fallback from older localStorage format (ISO string)
+  timestamp?: string        // fallback ISO string for older localStorage format
 }
 
 export default function OrdersPage() {
@@ -29,10 +30,12 @@ export default function OrdersPage() {
   const router = useRouter()
   const [orders, setOrders] = useState<OrderDoc[]>([])
   const [loadingOrders, setLoadingOrders] = useState(true)
-  
+
+  // Kick to login if not signed in
   useEffect(() => {
     if (!isLoading && !user) router.push("/login")
   }, [user, isLoading, router])
+
   useEffect(() => {
     const load = async () => {
       if (!user?.uid) { setLoadingOrders(false); return }
@@ -41,18 +44,19 @@ export default function OrdersPage() {
         const colRef = collection(db, "orders")
         const isAdmin = (user.email || "").toLowerCase() === "admin@admin.com"
 
-        let docs = []
+        let docs: any[] = []
 
         if (isAdmin) {
+          // Admin: try to order by createdAt desc; fall back to unordered if missing index
           try {
             const snap = await getDocs(query(colRef, orderBy("createdAt", "desc")))
             docs = snap.docs
-          } catch (e: any) {
-
+          } catch {
             const snap = await getDocs(colRef)
             docs = snap.docs
           }
         } else {
+          // Normal user: query by userId (preferred), then by email, then filter all as last resort
           let snap
           try {
             snap = await getDocs(query(colRef, where("userId", "==", user.uid), orderBy("createdAt", "desc")))
@@ -75,13 +79,15 @@ export default function OrdersPage() {
             }
           }
         }
-        const list = docs.map(d => {
+
+        const list: OrderDoc[] = docs.map(d => {
           const data = d.data() as any
           return {
             id: d.id,
             name: data.name ?? "",
             email: data.email ?? "",
             address: data.address ?? "",
+            phone: (data.phone ?? "").toString(), // NEW
             items: Array.isArray(data.items) ? data.items : [],
             createdAt: data.createdAt ?? null,
             timestamp: data.timestamp ?? null,
@@ -99,14 +105,13 @@ export default function OrdersPage() {
       } finally {
         setLoadingOrders(false)
       }
-
     }
+
     load()
   }, [user?.uid, user?.email])
 
-
   const fmtDate = (o: OrderDoc) => {
-    if (o.createdAt && o.createdAt.toDate) return o.createdAt.toDate().toLocaleString()
+    if (o.createdAt && (o.createdAt as any).toDate) return (o.createdAt as any).toDate().toLocaleString()
     if (o.timestamp) return new Date(o.timestamp).toLocaleString()
     return ""
   }
@@ -116,11 +121,11 @@ export default function OrdersPage() {
   return (
     <div className="min-h-screen bg-pink-50 py-10 px-4">
       <div className="w-full max-w-sm">
-        {/* Back Button */}
         <button
           type="button"
           onClick={() => router.back()}
-          className="mb-4 text-pink-600 hover:underline flex items-center">
+          className="mb-4 text-pink-600 hover:underline flex items-center"
+        >
           ← Back
         </button>
       </div>
@@ -138,6 +143,11 @@ export default function OrdersPage() {
               <p><strong>Name:</strong> {order.name}</p>
               <p><strong>Email:</strong> {order.email}</p>
               <p><strong>Address:</strong> {order.address}</p>
+              {order.phone ? (
+                <p><strong>Phone:</strong> {order.phone}</p>   // NEW
+              ) : (
+                <p className="text-sm text-gray-500"><strong>Phone:</strong> —</p>
+              )}
               <p className="text-sm text-gray-500 mb-1">
                 <strong>Date:</strong> {fmtDate(order)}
               </p>
