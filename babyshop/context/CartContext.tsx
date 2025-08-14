@@ -1,5 +1,6 @@
 "use client"
 import { createContext, useContext, useEffect, useState, ReactNode } from "react"
+import { useAuth } from "@/context/AuthContext"
 import type { Product } from "../components/ProductCard"
 
 type CartItem = Product & { quantity: number }
@@ -14,6 +15,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined)
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([])
+  const { user, isLoading } = useAuth()
 
   useEffect(() => {
     const saved = localStorage.getItem("cart")
@@ -25,6 +27,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     localStorage.setItem("cart", JSON.stringify(cart))
   }, [cart])
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      setCart([])
+      try { localStorage.removeItem("cart") } catch {}
+    }
+  }, [user, isLoading])
 
   const addToCart = (product: Product) => {
     setCart(prev => {

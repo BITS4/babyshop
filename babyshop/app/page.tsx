@@ -17,7 +17,8 @@ export default function Home() {
   )
 
   return (
-    <main className="min-h-screen bg-pink-50">
+    // prevent page-level horizontal scroll
+    <main className="min-h-screen bg-pink-50 overflow-x-hidden">
       <Navbar />
       <HeroSection />
 
