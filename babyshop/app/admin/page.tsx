@@ -19,26 +19,31 @@ export default function AdminPage() {
   const [isEditing, setIsEditing] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
 
-  // redirect if not logged in
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.push("/login")
-    }
-  }, [user, isLoading, router])
+  const isAdmin = (user?.email || "").toLowerCase() === "vazirpirov15@gmail.com"
 
-  if (!user || isLoading) return null
+  // redirect if not logged in or not admin
+  useEffect(() => {
+    if (isLoading) return
+    if (!user) {
+      router.push("/login")
+      return
+    }
+    if (!isAdmin) {
+      router.push("/")
+      return
+    }
+  }, [user, isLoading, isAdmin, router])
+
+  if (isLoading || !user || !isAdmin) return null
 
   // soft-check an image URL without blocking saves (CDNs often block HEAD/GET)
   const softCheckImageUrl = async (url: string) => {
     try {
-      // allow local /images/... paths and data: URLs without fetch checks
       const isLocal = url.startsWith("/") || url.startsWith("data:")
       if (isLocal) return
-
-      // opaque due to no-cors; errors only if truly unreachable
       await fetch(url, { method: "GET", mode: "no-cors" })
     } catch {
-      // ignore — do not block submission
+      // ignore
     }
   }
 
@@ -52,11 +57,10 @@ export default function AdminPage() {
 
     const numericPrice = typeof price === "number" ? price : parseFloat(price as unknown as string)
     if (Number.isNaN(numericPrice) || numericPrice < 0) {
-      alert("❌ Price must be a valid non‑negative number.")
+      alert("❌ Price must be a valid non-negative number.")
       return
     }
 
-    // best-effort image URL check (non-blocking)
     await softCheckImageUrl(image.trim())
 
     if (isEditing && editId !== null) {
@@ -68,7 +72,6 @@ export default function AdminPage() {
         image: image.trim(),
       }
       const updatedList = products.map(p => (p.id === editId ? updatedProduct : p))
-      // keep storage in sync for your context’s current approach
       localStorage.setItem("products", JSON.stringify(updatedList))
       setProducts(updatedList)
       alert("✅ Product updated.")
@@ -82,7 +85,6 @@ export default function AdminPage() {
       alert("✅ Product added.")
     }
 
-    // reset form
     setName("")
     setPrice("")
     setImage("")
@@ -103,7 +105,6 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-pink-50 py-10 px-4">
       <div className="w-full max-w-sm">
-        {/* Back Button */}
         <button
           type="button"
           onClick={() => router.back()}
@@ -173,7 +174,6 @@ export default function AdminPage() {
         </button>
       </form>
 
-      {/* Product List with Delete & Edit */}
       <div className="max-w-4xl mx-auto space-y-4">
         <h2 className="text-xl font-bold text-center text-pink-600 mb-4">Product List</h2>
         {products.length === 0 ? (

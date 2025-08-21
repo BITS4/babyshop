@@ -31,9 +31,14 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderDoc[]>([])
   const [loadingOrders, setLoadingOrders] = useState(true)
 
-  // redirect if not signed in
+  const isAdmin = (user?.email || "").toLowerCase() === "vazirpirov15@gmail.com"
+
+  // must be signed in (but NOT admin-only)
   useEffect(() => {
-    if (!isLoading && !user) router.push("/login")
+    if (isLoading) return
+    if (!user) {
+      router.push("/login")
+    }
   }, [user, isLoading, router])
 
   useEffect(() => {
@@ -42,12 +47,10 @@ export default function OrdersPage() {
 
       try {
         const colRef = collection(db, "orders")
-        const isAdmin = (user.email || "").toLowerCase() === "admin@admin.com"
-
         let docs: any[] = []
 
         if (isAdmin) {
-          // admin: prefer createdAt desc, fallback to unordered if index missing
+          // admin: all orders (prefer createdAt desc)
           try {
             const snap = await getDocs(query(colRef, orderBy("createdAt", "desc")))
             docs = snap.docs
@@ -56,10 +59,12 @@ export default function OrdersPage() {
             docs = snap.docs
           }
         } else {
-          // user: by userId then by email then filter all
+          // regular user: their own orders only
           let snap
           try {
-            snap = await getDocs(query(colRef, where("userId", "==", user.uid), orderBy("createdAt", "desc")))
+            snap = await getDocs(
+              query(colRef, where("userId", "==", user.uid), orderBy("createdAt", "desc"))
+            )
           } catch {
             snap = await getDocs(query(colRef, where("userId", "==", user.uid)))
           }
@@ -67,6 +72,7 @@ export default function OrdersPage() {
           if (!snap.empty) {
             docs = snap.docs
           } else {
+            // fallback by email, then final client-side filter
             const byEmail = await getDocs(query(colRef, where("email", "==", user.email)))
             if (!byEmail.empty) {
               docs = byEmail.docs
@@ -116,7 +122,7 @@ export default function OrdersPage() {
     }
 
     load()
-  }, [user?.uid, user?.email])
+  }, [user?.uid, user?.email, isAdmin])
 
   const fmtDate = (o: OrderDoc) => {
     const ts: any = o.createdAt
@@ -152,7 +158,6 @@ export default function OrdersPage() {
               <p><strong>Name:</strong> {order.name}</p>
               <p><strong>Email:</strong> {order.email}</p>
               <p><strong>Address:</strong> {order.address}</p>
-              {/* Phone */}
               {order.phone ? (
                 <p><strong>Phone:</strong> {order.phone}</p>
               ) : (

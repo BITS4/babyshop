@@ -15,12 +15,10 @@ export default function Navbar() {
   const { user, logout } = useAuth()
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0)
 
-  // ---- added: avatar state (non-invasive)
   const [avatarUrl, setAvatarUrl] = useState<string>("")
   const [busy, setBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  // SVG fallback so we never 404 if no local placeholder file
   const FALLBACK_AVATAR =
     "data:image/svg+xml;utf8," +
     encodeURIComponent(
@@ -70,17 +68,16 @@ export default function Navbar() {
       e.target.value = ""
     }
   }
-  // ---- end added
+
+  const isAdmin = (user?.email || "").toLowerCase() === "vazirpirov15@gmail.com"
 
   return (
     <header className="w-full bg-white shadow-md">
       <div className="mx-auto max-w-screen-xl px-6 py-4 flex items-center gap-4">
-        {/* Brand (fixed, never scrolls) */}
         <Link href="/" className="shrink-0">
           <h1 className="text-2xl font-bold text-pink-500">BabyShop</h1>
         </Link>
 
-        {/* NAV: single line, scrolls horizontally when needed */}
         <nav
           className="
             flex-1 min-w-0 overflow-x-auto overscroll-x-contain
@@ -103,12 +100,15 @@ export default function Navbar() {
               )}
             </Link>
 
+            {user && isAdmin && (
+              <Link href="/admin" className="hover:text-pink-500 flex-none">Admin</Link>
+            )}
+
             {user && (
               <>
-                <Link href="/admin" className="hover:text-pink-500 flex-none">Admin</Link>
-                <Link href="/profile" className="hover:text-pink-500 flex-none">My Page</Link>
                 <Link href="/admin/orders" className="hover:text-pink-500 flex-none">Orders</Link>
-                {/* avatar button with inline + uploader */}
+                <Link href="/profile" className="hover:text-pink-500 flex-none">My Page</Link>
+
                 <div className="relative h-8 w-8 rounded-full border border-neutral-200 overflow-hidden flex-none">
                   <img
                     src={avatarUrl || FALLBACK_AVATAR}
@@ -139,7 +139,6 @@ export default function Navbar() {
 
             {user ? (
               <>
-                {/* keep on one line; allow long emails without wrapping */}
                 <span className="text-sm text-pink-600 flex-none">
                   👋 {user.email ?? "User"}
                 </span>
