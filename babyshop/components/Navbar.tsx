@@ -74,10 +74,12 @@ export default function Navbar() {
   return (
     <header className="w-full bg-white shadow-md">
       <div className="mx-auto max-w-screen-xl px-6 py-4 flex items-center gap-4">
+        {/* Left: Brand (fixed) */}
         <Link href="/" className="shrink-0">
           <h1 className="text-2xl font-bold text-pink-500">BabyShop</h1>
         </Link>
 
+        {/* Middle: Scrollable nav row */}
         <nav
           className="
             flex-1 min-w-0 overflow-x-auto overscroll-x-contain
@@ -108,58 +110,62 @@ export default function Navbar() {
               <>
                 <Link href="/admin/orders" className="hover:text-pink-500 flex-none">Orders</Link>
                 <Link href="/profile" className="hover:text-pink-500 flex-none">My Page</Link>
-
-                <div className="relative h-8 w-8 rounded-full border border-neutral-200 overflow-hidden flex-none">
-                  <img
-                    src={avatarUrl || FALLBACK_AVATAR}
-                    alt="avatar"
-                    className="h-full w-full object-cover"
-                    referrerPolicy="no-referrer"
-                    onError={(ev) => { (ev.currentTarget as HTMLImageElement).src = FALLBACK_AVATAR }}
-                  />
-                  <button
-                    type="button"
-                    onClick={(ev) => { ev.stopPropagation(); if (!busy) openPicker() }}
-                    className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-pink-500 text-white text-sm leading-none flex items-center justify-center shadow hover:bg-pink-600 active:scale-95"
-                    title="Upload your photo"
-                    aria-label="Upload your photo"
-                  >
-                    +
-                  </button>
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={onPick}
-                  />
-                </div>
-              </>
-            )}
-
-            {user ? (
-              <>
-                <span className="text-sm text-pink-600 flex-none">
-                  👋 {user.email ?? "User"}
-                </span>
-                <button
-                  onClick={() => {
-                    logout()
-                    location.href = "/"
-                  }}
-                  className="text-sm text-red-500 hover:underline flex-none"
-                >
-                  Logout
-                </button>
-              </>
-            ) : (
-              <>
-                <Link href="/login" className="hover:text-pink-500 flex-none">Login</Link>
-                <Link href="/register" className="hover:text-pink-500 flex-none">Register</Link>
               </>
             )}
           </div>
         </nav>
+
+        {/* Right: Auth actions (fixed, always visible) */}
+        <div className="flex items-center gap-3 shrink-0 text-gray-700">
+          {user ? (
+            <>
+              <span className="text-sm text-pink-600 hidden sm:inline">
+                👋 {user.email ?? "User"}
+              </span>
+
+              <div className="relative h-8 w-8 rounded-full border border-neutral-200 overflow-hidden">
+                <img
+                  src={avatarUrl || FALLBACK_AVATAR}
+                  alt="avatar"
+                  className="h-full w-full object-cover"
+                  referrerPolicy="no-referrer"
+                  onError={(ev) => { (ev.currentTarget as HTMLImageElement).src = FALLBACK_AVATAR }}
+                />
+                <button
+                  type="button"
+                  onClick={(ev) => { ev.stopPropagation(); if (!busy) openPicker() }}
+                  className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-pink-500 text-white text-sm leading-none flex items-center justify-center shadow hover:bg-pink-600 active:scale-95"
+                  title="Upload your photo"
+                  aria-label="Upload your photo"
+                >
+                  +
+                </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={onPick}
+                />
+              </div>
+
+              <button
+                onClick={() => {
+                  logout()
+                  location.href = "/"
+                }}
+                className="text-sm hover:text-pink-500"
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <Link href="/login" className="hover:text-pink-500">Login</Link>
+              <Link href="/register" className="hover:text-pink-500">Sign up</Link>
+            </>
+          )}
+        </div>
       </div>
     </header>
   )
