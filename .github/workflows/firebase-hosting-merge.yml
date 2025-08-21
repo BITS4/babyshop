@@ -1,32 +1,38 @@
+# .github/workflows/firebase-hosting-merge.yml
 name: Deploy to Firebase Hosting on merge
+
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
+
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Show workspace
-        run: |
-          pwd
-          ls -la
-          ls -la babyshop || true
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: babyshop/package-lock.json
 
       - name: Install deps
         run: npm ci
         working-directory: babyshop
 
-      - name: Build (Next.js static export via output:export)
-        run: npm run build
+      - name: Build (Next)
+        run: npm run build         # <-- only build; with output: "export" this creates babyshop/out
         working-directory: babyshop
 
-      - name: Check build output
+      - name: Verify out folder
         run: |
+          echo "Listing babyshop/"
           ls -la
+          echo "Listing babyshop/out"
           ls -la out || true
+          test -e out/index.html || (echo "out/index.html missing" && exit 1)
         working-directory: babyshop
 
       - name: Deploy to Firebase Hosting
@@ -34,6 +40,6 @@ jobs:
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SHOP_AUTH_2825F }}
-          channelId: live
           projectId: shop-auth-2825f
+          channelId: live
           entryPoint: babyshop

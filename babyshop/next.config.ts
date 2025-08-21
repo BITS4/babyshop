@@ -1,6 +1,10 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+// babyshop/next.config.ts
+import type { NextConfig } from "next"
+
+const nextConfig: NextConfig = {
+  output: "export",                    
   images: {
+    unoptimized: true,                 
     remotePatterns: [
       { protocol: "https", hostname: "firebasestorage.googleapis.com" },
       { protocol: "https", hostname: "lh3.googleusercontent.com" },
@@ -8,5 +12,5 @@ const nextConfig = {
     ],
   },
 }
-module.exports = nextConfig
-// or export default nextConfig for .mjs
+
+export default nextConfig
