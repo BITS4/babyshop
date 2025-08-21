@@ -4,11 +4,73 @@ import Link from "next/link"
 import { useCart } from "../context/CartContext"
 import { ShoppingCartIcon } from "@heroicons/react/24/outline"
 import { useAuth } from "../context/AuthContext"
+import { useEffect, useRef, useState, ChangeEvent } from "react"
+import { db, auth, storage } from "@/app/firebase"
+import { doc, getDoc, setDoc } from "firebase/firestore"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { updateProfile } from "firebase/auth"
 
 export default function Navbar() {
   const { cart } = useCart()
   const { user, logout } = useAuth()
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0)
+
+  // ---- added: avatar state (non-invasive)
+  const [avatarUrl, setAvatarUrl] = useState<string>("")
+  const [busy, setBusy] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  // SVG fallback so we never 404 if no local placeholder file
+  const FALLBACK_AVATAR =
+    "data:image/svg+xml;utf8," +
+    encodeURIComponent(
+      `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'>
+        <rect width='100%' height='100%' fill='#f3f4f6'/>
+        <circle cx='40' cy='30' r='14' fill='#d1d5db'/>
+        <rect x='18' y='48' width='44' height='18' rx='9' fill='#d1d5db'/>
+      </svg>`
+    )
+
+  useEffect(() => {
+    const load = async () => {
+      if (!user?.uid) { setAvatarUrl(""); return }
+      try {
+        const snap = await getDoc(doc(db, "users", user.uid))
+        const url = (snap.exists() && (snap.data() as any).photoURL) || user.photoURL || ""
+        setAvatarUrl(url)
+      } catch {
+        setAvatarUrl(user?.photoURL || "")
+      }
+    }
+    load()
+  }, [user?.uid, user?.photoURL])
+
+  const openPicker = () => fileRef.current?.click()
+
+  const onPick = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !user?.uid) return
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Max file size is 5MB.")
+      e.target.value = ""
+      return
+    }
+    try {
+      setBusy(true)
+      const storageRef = ref(storage, `avatars/${user.uid}`)
+      await uploadBytes(storageRef, file, { contentType: file.type })
+      const url = await getDownloadURL(storageRef)
+      setAvatarUrl(url)
+      await setDoc(doc(db, "users", user.uid), { photoURL: url, updatedAt: new Date().toISOString() }, { merge: true })
+      if (auth.currentUser) await updateProfile(auth.currentUser, { photoURL: url })
+    } catch (err: any) {
+      alert(err?.message || "Upload failed.")
+    } finally {
+      setBusy(false)
+      e.target.value = ""
+    }
+  }
+  // ---- end added
 
   return (
     <header className="w-full bg-white shadow-md">
@@ -46,6 +108,32 @@ export default function Navbar() {
                 <Link href="/admin" className="hover:text-pink-500 flex-none">Admin</Link>
                 <Link href="/profile" className="hover:text-pink-500 flex-none">My Page</Link>
                 <Link href="/admin/orders" className="hover:text-pink-500 flex-none">Orders</Link>
+                {/* avatar button with inline + uploader */}
+                <div className="relative h-8 w-8 rounded-full border border-neutral-200 overflow-hidden flex-none">
+                  <img
+                    src={avatarUrl || FALLBACK_AVATAR}
+                    alt="avatar"
+                    className="h-full w-full object-cover"
+                    referrerPolicy="no-referrer"
+                    onError={(ev) => { (ev.currentTarget as HTMLImageElement).src = FALLBACK_AVATAR }}
+                  />
+                  <button
+                    type="button"
+                    onClick={(ev) => { ev.stopPropagation(); if (!busy) openPicker() }}
+                    className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-pink-500 text-white text-sm leading-none flex items-center justify-center shadow hover:bg-pink-600 active:scale-95"
+                    title="Upload your photo"
+                    aria-label="Upload your photo"
+                  >
+                    +
+                  </button>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={onPick}
+                  />
+                </div>
               </>
             )}
 
