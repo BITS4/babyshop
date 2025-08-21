@@ -131,15 +131,6 @@ export default function Navbar() {
                   referrerPolicy="no-referrer"
                   onError={(ev) => { (ev.currentTarget as HTMLImageElement).src = FALLBACK_AVATAR }}
                 />
-                <button
-                  type="button"
-                  onClick={(ev) => { ev.stopPropagation(); if (!busy) openPicker() }}
-                  className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-pink-500 text-white text-sm leading-none flex items-center justify-center shadow hover:bg-pink-600 active:scale-95"
-                  title="Upload your photo"
-                  aria-label="Upload your photo"
-                >
-                  +
-                </button>
                 <input
                   ref={fileRef}
                   type="file"
