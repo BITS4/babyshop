@@ -43,8 +43,6 @@ export default function Navbar() {
     load()
   }, [user?.uid, user?.photoURL])
 
-  const openPicker = () => fileRef.current?.click()
-
   const onPick = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !user?.uid) return
@@ -59,7 +57,11 @@ export default function Navbar() {
       await uploadBytes(storageRef, file, { contentType: file.type })
       const url = await getDownloadURL(storageRef)
       setAvatarUrl(url)
-      await setDoc(doc(db, "users", user.uid), { photoURL: url, updatedAt: new Date().toISOString() }, { merge: true })
+      await setDoc(
+        doc(db, "users", user.uid),
+        { photoURL: url, updatedAt: new Date().toISOString() },
+        { merge: true }
+      )
       if (auth.currentUser) await updateProfile(auth.currentUser, { photoURL: url })
     } catch (err: any) {
       alert(err?.message || "Upload failed.")
@@ -74,7 +76,7 @@ export default function Navbar() {
   return (
     <header className="w-full bg-white shadow-md">
       <div className="mx-auto max-w-screen-xl px-6 py-4 flex items-center gap-4">
-        {/* Left: Brand (fixed) */}
+        {/* Left: Brand */}
         <Link href="/" className="shrink-0">
           <h1 className="text-2xl font-bold text-pink-500">BabyShop</h1>
         </Link>
@@ -119,11 +121,21 @@ export default function Navbar() {
         <div className="flex items-center gap-3 shrink-0 text-gray-700">
           {user ? (
             <>
-              <span className="text-sm text-pink-600 hidden sm:inline">
+              {/* 👋 + email (ALWAYS visible, truncated if long) */}
+              <span
+                className="text-sm text-pink-600 max-w-[180px] truncate"
+                title={user.email || "User"}
+              >
                 👋 {user.email ?? "User"}
               </span>
 
-              <div className="relative h-8 w-8 rounded-full border border-neutral-200 overflow-hidden">
+              {/* Avatar (click to upload) */}
+              <button
+                type="button"
+                onClick={() => !busy && fileRef.current?.click()}
+                className="relative h-8 w-8 rounded-full border border-neutral-200 overflow-hidden focus:outline-none focus:ring-2 focus:ring-pink-300"
+                title={busy ? "Uploading…" : "Change avatar"}
+              >
                 <img
                   src={avatarUrl || FALLBACK_AVATAR}
                   alt="avatar"
@@ -131,14 +143,14 @@ export default function Navbar() {
                   referrerPolicy="no-referrer"
                   onError={(ev) => { (ev.currentTarget as HTMLImageElement).src = FALLBACK_AVATAR }}
                 />
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={onPick}
-                />
-              </div>
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={onPick}
+              />
 
               <button
                 onClick={() => {
