@@ -52,17 +52,22 @@ export function ProductProvider({ children }: { children: ReactNode }) {
     })
     return () => unsub()
   }, [])
-
   const addProduct = async (product: Omit<Product, "id">) => {
-    const localId = Date.now()
-    await addDoc(collection(db, "products"), {
-      localId,
-      name: product.name,
-      description: product.description,
-      price: product.price,
-      image: product.image, // can be https:// or data:image/...
-      createdAt: serverTimestamp(),
-    })
+    try {
+      const localId = Date.now()
+      await addDoc(collection(db, "products"), {
+        localId,
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        image: product.image,
+        createdAt: serverTimestamp(),
+      })
+    } catch (e: any) {
+      console.error("addProduct error:", e)
+      alert(e?.code ?? e?.message ?? "Failed to add product")
+      throw e
+    }
   }
 
   const updateProduct = async (product: Product) => {
