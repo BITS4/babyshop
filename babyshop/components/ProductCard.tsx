@@ -17,16 +17,16 @@ export default function ProductCard({ product }: { product: Product }) {
   return (
     <div className="bg-white rounded-lg shadow p-4 flex flex-col items-center">
       {!imageError ? (
-        <img
-          src={product.image}
-          alt={product.name}
-          width={150}
-          height={150}
-          className="rounded object-cover"
-          onError={() => setImageError(true)}
-        />
+        <div className="w-40 aspect-square overflow-hidden rounded bg-gray-50">
+          <img
+            src={product.image}
+            alt={product.name}
+            className="w-full h-full object-cover"
+            onError={() => setImageError(true)}
+          />
+        </div>
       ) : (
-        <div className="w-[150px] h-[150px] flex items-center justify-center bg-gray-100 text-gray-500 text-sm rounded">
+        <div className="w-40 aspect-square flex items-center justify-center bg-gray-100 text-gray-500 text-sm rounded">
           Invalid image URL
         </div>
       )}
