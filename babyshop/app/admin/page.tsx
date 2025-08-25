@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client"
 
-import { useEffect, useRef, useState, ChangeEvent } from "react"
+import { useEffect, useRef, useState, ChangeEvent, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useProducts } from "../../context/ProductContext"
 import { useAuth } from "../../context/AuthContext"
@@ -14,7 +14,7 @@ export default function AdminPage() {
 
   const [name, setName] = useState("")
   const [price, setPrice] = useState<number | "">("")
-  const [image, setImage] = useState("") // https:// or data:image/...
+  const [image, setImage] = useState("") // accepts https://, data:image/..., Google Drive links
   const [description, setDescription] = useState("")
   const [isEditing, setIsEditing] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
@@ -33,13 +33,74 @@ export default function AdminPage() {
 
   if (isLoading || !user || !isAdmin) return null
 
-  const softCheckImageUrl = async (url: string) => {
-    try {
-      if (url.startsWith("data:") || url.startsWith("/")) return
-      await fetch(url, { method: "GET", mode: "no-cors" })
-    } catch {}
+  // --- Google Drive helpers ---------------------------------------------------
+
+  // Extract a Drive file ID from various URL shapes
+  const extractDriveId = (url: string): string | null => {
+    const u = url.trim()
+    if (!u) return null
+    const patterns = [
+      /https?:\/\/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]{10,})/i,
+      /https?:\/\/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]{10,})/i,
+      /https?:\/\/drive\.google\.com\/uc\?(?:export=[^&]+&)?id=([a-zA-Z0-9_-]{10,})/i,
+      /https?:\/\/drive\.googleusercontent\.com\/.*?[?&]id=([a-zA-Z0-9_-]{10,})/i,
+    ]
+    for (const re of patterns) {
+      const m = u.match(re)
+      if (m?.[1]) return m[1]
+    }
+    return null
   }
 
+  // Build a set of candidate direct-ish URLs for an <img>
+  const driveCandidates = (url: string): string[] => {
+    const id = extractDriveId(url)
+    if (!id) return [url] // not a Drive link; use as-is
+    return [
+      // primary: typical inline view
+      `https://drive.google.com/uc?export=view&id=${id}`,
+      // fallback: thumbnail endpoint (renders image, up to requested width)
+      `https://drive.google.com/thumbnail?id=${id}&sz=w1000`,
+      // extra fallback: direct content (may trigger download or need cookie on very large files)
+      `https://drive.google.com/uc?export=download&id=${id}`,
+    ]
+  }
+
+  // Component to render an image with automatic Drive fallbacks
+  function DriveImage({ url, alt, className }: { url: string; alt: string; className?: string }) {
+    const variants = useMemo(() => driveCandidates(url), [url])
+    const [idx, setIdx] = useState(0)
+    const src = variants[idx] || url
+    return (
+      <img
+        src={src}
+        alt={alt}
+        className={className}
+        onError={() => {
+          setIdx(i => (i + 1 < variants.length ? i + 1 : i))
+        }}
+      />
+    )
+  }
+
+  // Normalize a single URL into the first (best) candidate for saving
+  const normalizeForSave = (url: string): string => {
+    const variants = driveCandidates(url)
+    return variants[0] // save the primary; we still fallback on render
+  }
+
+  // Best-effort online check (doesn't block submission)
+  const softCheckImageUrl = async (url: string) => {
+    try {
+      const u = normalizeForSave(url)
+      if (u.startsWith("data:") || u.startsWith("/")) return
+      await fetch(u, { method: "GET", mode: "no-cors" })
+    } catch {
+      // ignore
+    }
+  }
+
+  // --- Local file support (still works without Drive) -------------------------
   const fileToDataUrl = (file: File, maxDim = 1024, quality = 0.85): Promise<string> =>
     new Promise((resolve, reject) => {
       const img = document.createElement("img")
@@ -85,13 +146,15 @@ export default function AdminPage() {
     }
   }
 
+  // --- Submit -----------------------------------------------------------------
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim() || price === "" || !image.trim() || !description.trim()) { alert("❌ Please fill in all fields."); return }
     const numericPrice = typeof price === "number" ? price : parseFloat(price as unknown as string)
     if (Number.isNaN(numericPrice) || numericPrice < 0) { alert("❌ Price must be a valid non-negative number."); return }
 
-    await softCheckImageUrl(image.trim())
+    const finalImage = normalizeForSave(image.trim())
+    await softCheckImageUrl(finalImage)
 
     if (isEditing && editId !== null) {
       await updateProduct({
@@ -99,7 +162,7 @@ export default function AdminPage() {
         name: name.trim(),
         description: description.trim(),
         price: numericPrice,
-        image: image.trim(),
+        image: finalImage,
       })
       alert("✅ Product updated.")
     } else {
@@ -107,7 +170,7 @@ export default function AdminPage() {
         name: name.trim(),
         description: description.trim(),
         price: numericPrice,
-        image: image.trim(),
+        image: finalImage,
       })
       alert("✅ Product added.")
     }
@@ -124,6 +187,7 @@ export default function AdminPage() {
     setDescription(product.description)
   }
 
+  // --- UI ---------------------------------------------------------------------
   return (
     <div className="min-h-screen bg-pink-50 py-10 px-4">
       <div className="w-full max-w-sm">
@@ -143,16 +207,28 @@ export default function AdminPage() {
         <input type="number" placeholder="Price (e.g. 19.99)" value={price} onChange={e => setPrice(e.target.value === "" ? "" : parseFloat(e.target.value))} className="w-full border px-3 py-2 rounded" step="0.01" min="0" required />
         <input type="text" placeholder="Description" value={description} onChange={e => setDescription(e.target.value)} className="w-full border px-3 py-2 rounded" required />
 
-        <div className="space-y-3">
-          <input type="text" placeholder="Image URL (https://… or /images/… or data:image/…)" value={image} onChange={e => setImage(e.target.value)} className="w-full border px-3 py-2 rounded" required />
+        <div className="space-y-2">
+          <input
+            type="text"
+            placeholder="Image URL (supports Google Drive links)"
+            value={image}
+            onChange={e => setImage(e.target.value)}
+            className="w-full border px-3 py-2 rounded"
+            required
+          />
+          <p className="text-xs text-gray-500">
+            Tip: Paste a Drive link like <code className="bg-gray-100 px-1 rounded">https://drive.google.com/file/d/FILE_ID/view?...</code> and set sharing to <strong>Anyone with the link – Viewer</strong>.
+          </p>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 mt-2">
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPick} />
             <button type="button" onClick={() => fileRef.current?.click()} className="px-3 py-2 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 disabled:opacity-50" disabled={processingImage}>
               {processingImage ? "Processing…" : "Choose image file"}
             </button>
             {image && !processingImage && (
-              <span className="text-xs text-gray-500 truncate max-w-[240px]" title={image}>Image set ✓</span>
+              <span className="text-xs text-gray-500 truncate max-w-[240px]" title={normalizeForSave(image)}>
+                Image set ✓
+              </span>
             )}
           </div>
 
@@ -160,7 +236,7 @@ export default function AdminPage() {
 
           {image && (
             <div className="mt-2 w-24 aspect-square overflow-hidden rounded border border-gray-200 bg-white">
-              <img src={image} alt="preview" className="w-full h-full object-cover" />
+              <DriveImage url={image} alt="preview" className="w-full h-full object-cover" />
             </div>
           )}
         </div>
@@ -179,7 +255,7 @@ export default function AdminPage() {
             {products.map(product => (
               <div key={product.id} className="bg-white p-4 rounded shadow text-center relative">
                 <div className="w-40 aspect-square overflow-hidden rounded mx-auto bg-gray-50">
-                  <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                  <DriveImage url={product.image} alt={product.name} className="w-full h-full object-cover" />
                 </div>
                 <h3 className="mt-2 font-semibold text-lg text-gray-800">{product.name}</h3>
                 <p className="text-sm text-gray-500">{product.description}</p>
