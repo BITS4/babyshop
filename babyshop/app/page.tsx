@@ -3,7 +3,8 @@
 import Navbar from "@/components/Navbar"
 import HeroSection from "../components/HeroSection"
 import ProductCard from "../components/ProductCard"
-import CartPreview from "../components/CartPreview"
+import FloatingCart from "../components/FloatingCart" // ← add this
+// import CartPreview from "../components/CartPreview" // ← optional: remove/keep as you like
 import { useProducts } from "../context/ProductContext"
 import { useState } from "react"
 
@@ -17,10 +18,12 @@ export default function Home() {
   )
 
   return (
-    // prevent page-level horizontal scroll
     <main className="min-h-screen bg-pink-50 overflow-x-hidden">
       <Navbar />
       <HeroSection />
+
+      {/* Floating cart is fixed; visible anywhere on this page */}
+      <FloatingCart />
 
       <section className="py-10 px-6">
         <h2 className="text-2xl font-bold text-pink-600 mb-6 text-center">Featured Products</h2>
@@ -46,7 +49,7 @@ export default function Home() {
         )}
       </section>
 
-      <CartPreview />
+      {/* <CartPreview />  // ← optional: remove or keep, since FloatingCart covers it */}
     </main>
   )
 }

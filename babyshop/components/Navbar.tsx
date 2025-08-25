@@ -2,7 +2,15 @@
 
 import Link from "next/link"
 import { useCart } from "../context/CartContext"
-import { ShoppingCartIcon } from "@heroicons/react/24/outline"
+import {
+  Bars3Icon,
+  XMarkIcon,
+  HomeIcon,
+  ShoppingCartIcon,
+  ClipboardDocumentListIcon,
+  UserIcon,
+  ShieldCheckIcon,
+} from "@heroicons/react/24/outline"
 import { useAuth } from "../context/AuthContext"
 import { useEffect, useRef, useState, ChangeEvent } from "react"
 import { db, auth, storage } from "@/app/firebase"
@@ -18,6 +26,7 @@ export default function Navbar() {
   const [avatarUrl, setAvatarUrl] = useState<string>("")
   const [busy, setBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const [mobileOpen, setMobileOpen] = useState(false)
 
   const FALLBACK_AVATAR =
     "data:image/svg+xml;utf8," +
@@ -73,17 +82,68 @@ export default function Navbar() {
 
   const isAdmin = (user?.email || "").toLowerCase() === "vazirpirov15@gmail.com"
 
+  const NavLinks = () => (
+    <>
+      <Link href="/" className="hover:text-pink-500 flex items-center gap-1.5 flex-none">
+        <HomeIcon className="h-5 w-5" />
+        <span>Home</span>
+      </Link>
+
+      <Link href="/cart" className="relative hover:text-pink-500 flex items-center gap-1.5 flex-none">
+        <ShoppingCartIcon className="h-5 w-5" />
+        <span>Cart</span>
+        {itemCount > 0 && (
+          <span className="absolute -top-2 right-0 translate-x-1/2 text-xs bg-pink-500 text-white px-1.5 py-0.5 rounded-full">
+            {itemCount}
+          </span>
+        )}
+      </Link>
+
+      {user && isAdmin && (
+        <Link href="/admin" className="hover:text-pink-500 flex items-center gap-1.5 flex-none">
+          <ShieldCheckIcon className="h-5 w-5" />
+          <span>Admin</span>
+        </Link>
+      )}
+
+      {user && (
+        <>
+          <Link href="/admin/orders" className="hover:text-pink-500 flex items-center gap-1.5 flex-none">
+            <ClipboardDocumentListIcon className="h-5 w-5" />
+            <span>Orders</span>
+          </Link>
+          <Link href="/profile" className="hover:text-pink-500 flex items-center gap-1.5 flex-none">
+            <UserIcon className="h-5 w-5" />
+            <span>My Page</span>
+          </Link>
+        </>
+      )}
+    </>
+  )
+
   return (
     <header className="w-full bg-white shadow-md">
-      <div className="mx-auto max-w-screen-xl px-6 py-4 flex items-center gap-4">
-        {/* Left: Brand */}
+      <div className="mx-auto max-w-screen-xl px-4 sm:px-6 py-4 flex items-center gap-3">
+        {/* LEFT: Hamburger BEFORE brand (left-side drawer) */}
+        <button
+          type="button"
+          className="md:hidden rounded p-2 hover:bg-pink-50"
+          onClick={() => setMobileOpen(true)}
+          aria-label="Open menu"
+          title="Open menu"
+        >
+          <Bars3Icon className="h-6 w-6 text-gray-700" />
+        </button>
+
+        {/* Brand */}
         <Link href="/" className="shrink-0">
           <h1 className="text-2xl font-bold text-pink-500">BabyShop</h1>
         </Link>
 
-        {/* Middle: Scrollable nav row */}
+        {/* Desktop nav (middle) */}
         <nav
           className="
+            hidden md:block
             flex-1 min-w-0 overflow-x-auto overscroll-x-contain
             whitespace-nowrap
             [-ms-overflow-style:'none'] [scrollbar-width:'none']
@@ -93,37 +153,17 @@ export default function Navbar() {
           aria-label="Main"
         >
           <div className="inline-flex items-center gap-6 text-gray-700">
-            <Link href="/" className="hover:text-pink-500 flex-none">Home</Link>
-
-            <Link href="/cart" className="relative hover:text-pink-500 flex items-center flex-none">
-              <ShoppingCartIcon className="h-6 w-6" />
-              {itemCount > 0 && (
-                <span className="absolute -top-2 right-0 translate-x-1/2 text-xs bg-pink-500 text-white px-1.5 py-0.5 rounded-full">
-                  {itemCount}
-                </span>
-              )}
-            </Link>
-
-            {user && isAdmin && (
-              <Link href="/admin" className="hover:text-pink-500 flex-none">Admin</Link>
-            )}
-
-            {user && (
-              <>
-                <Link href="/admin/orders" className="hover:text-pink-500 flex-none">Orders</Link>
-                <Link href="/profile" className="hover:text-pink-500 flex-none">My Page</Link>
-              </>
-            )}
+            <NavLinks />
           </div>
         </nav>
 
-        {/* Right: Auth actions (fixed, always visible) */}
-        <div className="flex items-center gap-3 shrink-0 text-gray-700">
+        {/* RIGHT: Auth actions (STICK TO RIGHT) */}
+        <div className="ml-auto flex items-center gap-3 shrink-0 text-gray-700">
           {user ? (
             <>
-              {/* 👋 + email (ALWAYS visible, truncated if long) */}
+              {/* 👋 + email */}
               <span
-                className="text-sm text-pink-600 max-w-[180px] truncate"
+                className="text-sm text-pink-600 max-w-[140px] sm:max-w-[220px] truncate"
                 title={user.email || "User"}
               >
                 👋 {user.email ?? "User"}
@@ -136,6 +176,7 @@ export default function Navbar() {
                 className="relative h-8 w-8 rounded-full border border-neutral-200 overflow-hidden focus:outline-none focus:ring-2 focus:ring-pink-300"
                 title={busy ? "Uploading…" : "Change avatar"}
               >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={avatarUrl || FALLBACK_AVATAR}
                   alt="avatar"
@@ -168,6 +209,97 @@ export default function Navbar() {
               <Link href="/register" className="hover:text-pink-500">Sign up</Link>
             </>
           )}
+        </div>
+      </div>
+
+      {/* MOBILE DRAWER (LEFT SIDE) */}
+      <div className="fixed inset-0 z-50 pointer-events-none">
+        {/* overlay */}
+        <div
+          className={`absolute inset-0 bg-black/40 transition-opacity duration-200 ${mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0"}`}
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+        {/* panel from LEFT */}
+        <div
+          className={`
+            absolute left-0 top-0 h-full w-72 max-w-[85vw] bg-white shadow-2xl flex flex-col
+            transform transition-transform duration-200
+            ${mobileOpen ? "translate-x-0 pointer-events-auto" : "-translate-x-full"}
+          `}
+          role="dialog"
+          aria-label="Mobile menu"
+        >
+          <div className="flex items-center justify-between px-4 py-3 border-b">
+            <h2 className="font-semibold text-gray-800">Menu</h2>
+            <button
+              className="p-2 rounded hover:bg-pink-50"
+              onClick={() => setMobileOpen(false)}
+              aria-label="Close menu"
+              title="Close menu"
+            >
+              <XMarkIcon className="h-6 w-6 text-gray-700" />
+            </button>
+          </div>
+
+          {/* links */}
+          <div className="flex-1 overflow-y-auto px-4 py-3">
+            <div className="flex flex-col gap-3 text-gray-800">
+              <Link href="/" onClick={() => setMobileOpen(false)} className="hover:text-pink-500 flex items-center gap-2">
+                <HomeIcon className="h-5 w-5" /> <span>Home</span>
+              </Link>
+              <Link href="/cart" onClick={() => setMobileOpen(false)} className="hover:text-pink-500 flex items-center gap-2">
+                <ShoppingCartIcon className="h-5 w-5" /> <span>Cart</span>
+              </Link>
+
+              {user && isAdmin && (
+                <Link href="/admin" onClick={() => setMobileOpen(false)} className="hover:text-pink-500 flex items-center gap-2">
+                  <ShieldCheckIcon className="h-5 w-5" /> <span>Admin</span>
+                </Link>
+              )}
+
+              {user && (
+                <>
+                  <Link href="/admin/orders" onClick={() => setMobileOpen(false)} className="hover:text-pink-500 flex items-center gap-2">
+                    <ClipboardDocumentListIcon className="h-5 w-5" /> <span>Orders</span>
+                  </Link>
+                  <Link href="/profile" onClick={() => setMobileOpen(false)} className="hover:text-pink-500 flex items-center gap-2">
+                    <UserIcon className="h-5 w-5" /> <span>My Page</span>
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* footer auth actions */}
+          <div className="px-4 py-3 border-t bg-pink-50">
+            {user ? (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-pink-700 truncate" title={user.email || "User"}>
+                  👋 {user.email ?? "User"}
+                </span>
+                <button
+                  onClick={() => {
+                    setMobileOpen(false)
+                    logout()
+                    location.href = "/"
+                  }}
+                  className="text-sm text-red-600 hover:text-red-700"
+                >
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                <Link href="/login" onClick={() => setMobileOpen(false)} className="text-pink-600 hover:text-pink-700">
+                  Login
+                </Link>
+                <Link href="/register" onClick={() => setMobileOpen(false)} className="text-pink-600 hover:text-pink-700">
+                  Sign up
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>
