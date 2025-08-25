@@ -8,6 +8,7 @@ export type Product = {
   description: string
   price: number
   image: string
+  category?: string // ← NEW (optional so old data still works)
 }
 
 // ---- helpers outside the component
@@ -41,7 +42,6 @@ const driveCandidates = (url?: string | null): string[] => {
 }
 
 export default function ProductCard({ product }: { product?: Partial<Product> | null }) {
-  // ⛑️ Never touch product.image directly. Normalize first.
   const p = (product && typeof product === "object") ? product : {}
   const safeImage = typeof p.image === "string" ? p.image : ""
   const priceNum = typeof p.price === "number" ? p.price : Number(p.price ?? 0)
@@ -71,6 +71,7 @@ export default function ProductCard({ product }: { product?: Partial<Product> | 
       description: String(p.description ?? ""),
       price: Number.isFinite(priceNum) ? priceNum : 0,
       image: safeImage,
+      category: typeof p.category === "string" ? p.category : undefined,
     }
     addToCart(cartProduct)
     setAdded(true)
@@ -80,6 +81,13 @@ export default function ProductCard({ product }: { product?: Partial<Product> | 
 
   return (
     <div className="bg-white rounded-lg shadow p-4 flex flex-col items-center relative">
+      {/* Category badge (optional) */}
+      {p.category && (
+        <span className="absolute top-2 left-2 text-[11px] px-2 py-0.5 rounded-full bg-pink-100 text-pink-700">
+          {p.category}
+        </span>
+      )}
+
       {!imageError && currentSrc ? (
         <div className="w-40 aspect-square overflow-hidden rounded bg-gray-50">
           {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -21,10 +21,8 @@ const ProductContext = createContext<ProductContextType | undefined>(undefined)
 
 export function ProductProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>([])
-  // map local numeric id -> Firestore doc id
   const idToDoc = useRef<Record<number, string>>({})
 
-  // realtime subscription
   useEffect(() => {
     const col = collection(db, "products")
     const q = query(col, orderBy("createdAt", "desc"))
@@ -41,6 +39,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
           description: String(data?.description ?? ""),
           price: Number(data?.price ?? 0),
           image: String(data?.image ?? ""),
+          category: typeof data?.category === "string" ? data.category : undefined, // ← NEW
         })
         map[localId] = d.id
       })
@@ -52,6 +51,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
     })
     return () => unsub()
   }, [])
+
   const addProduct = async (product: Omit<Product, "id">) => {
     try {
       const localId = Date.now()
@@ -61,6 +61,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
         description: product.description,
         price: product.price,
         image: product.image,
+        category: product.category ?? "uncategorized", // ← NEW
         createdAt: serverTimestamp(),
       })
     } catch (e: any) {
@@ -71,20 +72,19 @@ export function ProductProvider({ children }: { children: ReactNode }) {
   }
 
   const updateProduct = async (product: Product) => {
-    const docId = idToDoc.current[product.id]
-    let target = docId
-    if (!target) {
-      // fallback lookup
+    let docId = idToDoc.current[product.id]
+    if (!docId) {
       const q = query(collection(db, "products"), where("localId", "==", product.id))
       const snap = await getDocs(q)
-      target = snap.docs[0]?.id
+      docId = snap.docs[0]?.id
     }
-    if (!target) throw new Error("Product not found")
-    await updateDoc(doc(db, "products", target), {
+    if (!docId) throw new Error("Product not found")
+    await updateDoc(doc(db, "products", docId), {
       name: product.name,
       description: product.description,
       price: product.price,
       image: product.image,
+      category: product.category ?? "uncategorized", // ← NEW
     })
   }
 
