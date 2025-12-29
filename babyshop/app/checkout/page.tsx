@@ -22,14 +22,21 @@ export default function CheckoutPage() {
   // Load profile from Firestore and prefill fields
   useEffect(() => {
     const load = async () => {
-      if (!user?.uid) { setLoadingProfile(false); return }
+      if (!user?.uid) {
+        setLoadingProfile(false)
+        return
+      }
       try {
         const snap = await getDoc(doc(db, "users", user.uid))
         if (snap.exists()) {
-          const data = snap.data() as { name?: string; address?: string; phone?: string }
+          const data = snap.data() as {
+            name?: string
+            address?: string
+            phone?: string
+          }
           if (data?.name) {
             setName(data.name)
-            setNameLocked(true) // lock name if saved
+            setNameLocked(true)
           }
           if (data?.address) setAddress(data.address)
           if (data?.phone) setPhone(String(data.phone).replace(/\D/g, ""))
@@ -52,10 +59,12 @@ export default function CheckoutPage() {
       router.push("/login")
       return
     }
+
     if (!name.trim() || !address.trim()) {
       alert("❌ Please fill in all fields.")
       return
     }
+
     const digits = phone.replace(/\D/g, "")
     if (!digits) {
       alert("❌ Please enter your phone number.")
@@ -70,39 +79,36 @@ export default function CheckoutPage() {
       return
     }
 
-    const orderData = {
-      name: name.trim(),
-      email: user.email!,
-      address: address.trim(),
-      phone: digits,
-      items: cart.map(item => ({
-        ...item,
-        price: item.price ?? 0,
-        quantity: item.quantity ?? 1,
-        image: item.image ?? "",
-      })),
-      timestamp: new Date().toISOString(),
-    }
-
     try {
       setSubmitting(true)
 
-      // Save to Firestore
       await addDoc(collection(db, "orders"), {
-        userId: user.uid,   
-        email: orderData.email,
-        name: orderData.name,
-        address: orderData.address,
-        phone: orderData.phone,
-        items: orderData.items,
+        userId: user.uid,
+        email: user.email,
+        name: name.trim(),
+        address: address.trim(),
+        phone: digits,
+        items: cart.map(item => ({
+          name: String(item.name ?? ""),
+          price: Number(item.price ?? 0),
+          quantity: Number(item.quantity ?? 1),
+          image: String(item.image ?? ""),
+        })),
         createdAt: serverTimestamp(),
       })
 
+      localStorage.setItem(
+        "lastOrder",
+        JSON.stringify({
+          name,
+          email: user.email,
+          address,
+          phone: digits,
+          items: cart,
+          timestamp: new Date().toISOString(),
+        })
+      )
 
-      // Persist to localStorage for /thankyou
-      localStorage.setItem("lastOrder", JSON.stringify(orderData))
-
-      // Clear cart and go to thank-you page
       clearCart()
       router.push("/thankyou")
     } catch (err: any) {
@@ -115,15 +121,15 @@ export default function CheckoutPage() {
 
   if (loadingProfile) {
     return (
-      <div className="min-h-screen bg-pink-50 py-10 px-4 flex items-center justify-center">
-        <p className="text-gray-600">Loading your profile…</p>
+      <div className="min-h-screen bg-pink-50 flex items-center justify-center">
+        <p className="text-gray-700">Loading your profile…</p>
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-pink-50 py-10 px-4">
-      <div className="w-full max-w-sm">
+      <div className="max-w-md mx-auto">
         <button
           type="button"
           onClick={() => router.back()}
@@ -131,76 +137,98 @@ export default function CheckoutPage() {
         >
           ← Back
         </button>
-      </div>
 
-      <h1 className="text-3xl font-bold text-center text-pink-600 mb-6">Checkout</h1>
+        <h1 className="text-3xl font-bold text-center text-pink-600 mb-6">
+          Checkout
+        </h1>
 
-      <form onSubmit={handleSubmit} className="max-w-md mx-auto bg-white p-6 rounded shadow space-y-4">
-        {/* Name */}
-        <div>
-          <label className="block text-sm font-semibold mb-1">Full Name</label>
-          <input
-            type="text"
-            required
-            value={name}
-            onChange={e => setName(e.target.value)}
-            className="w-full border px-3 py-2 rounded disabled:bg-gray-50 placeholder:text-neutral-400/70"
-            disabled={nameLocked}
-            readOnly={nameLocked}
-            placeholder="e.g., John Kim"
-          />
-          {nameLocked ? (
-            <p className="text-xs text-gray-500 mt-1">Using your saved profile name.</p>
-          ) : (
-            <p className="text-xs text-gray-500 mt-1">
-              No saved name found. You can set it on your{" "}
-              <button type="button" className="underline text-pink-600" onClick={() => router.push("/profile")}>
-                Profile
-              </button>.
-            </p>
-          )}
-        </div>
-
-        {/* Address */}
-        <div>
-          <label className="block text-sm font-semibold mb-1">Shipping Address</label>
-          <textarea
-            required
-            value={address}
-            onChange={e => setAddress(e.target.value)}
-            className="w-full border px-3 py-2 rounded placeholder:text-neutral-400/70"
-            rows={3}
-            placeholder="City, district, street, building…"
-          />
-          <p className="text-xs text-gray-500 mt-1">Prefilled from your profile (you can edit).</p>
-        </div>
-
-        {/* Phone */}
-        <div>
-          <label className="block text-sm font-semibold mb-1">Phone Number</label>
-          <input
-            type="tel"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            value={phone}
-            onChange={e => setPhone(e.target.value.replace(/\D/g, ""))}
-            className="w-full border px-3 py-2 rounded placeholder:text-neutral-400/70"
-            placeholder="Numbers only (8–15 digits)"
-            required
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            {phone ? "Prefilled from your profile (you can edit)." : "Please provide a contact number for delivery."}
-          </p>
-        </div>
-
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full bg-pink-500 text-white py-2 rounded hover:bg-pink-600 transition disabled:opacity-60"
+        {/* OPAQUE FORM CARD */}
+        <form
+          onSubmit={handleSubmit}
+          className="bg-white/100 text-gray-900 p-6 rounded-lg shadow-md border border-pink-100 space-y-4"
         >
-          {submitting ? "Placing Order…" : "Place Order"}
-        </button>
-      </form>
+          {/* Name */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-900 mb-1">
+              Full Name
+            </label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={e => setName(e.target.value)}
+              disabled={nameLocked}
+              readOnly={nameLocked}
+              placeholder="e.g., John Kim"
+              className="w-full border border-gray-300 px-3 py-2 rounded text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-400"
+            />
+            {nameLocked ? (
+              <p className="text-xs text-gray-700 mt-1">
+                Using your saved profile name.
+              </p>
+            ) : (
+              <p className="text-xs text-gray-700 mt-1">
+                No saved name found. You can set it on your{" "}
+                <button
+                  type="button"
+                  className="underline text-pink-600"
+                  onClick={() => router.push("/profile")}
+                >
+                  Profile
+                </button>.
+              </p>
+            )}
+          </div>
+
+          {/* Address */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-900 mb-1">
+              Shipping Address
+            </label>
+            <textarea
+              required
+              value={address}
+              onChange={e => setAddress(e.target.value)}
+              rows={3}
+              placeholder="City, district, street, building…"
+              className="w-full border border-gray-300 px-3 py-2 rounded text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-400"
+            />
+            <p className="text-xs text-gray-700 mt-1">
+              Prefilled from your profile (you can edit).
+            </p>
+          </div>
+
+          {/* Phone */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-900 mb-1">
+              Phone Number
+            </label>
+            <input
+              type="tel"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={phone}
+              onChange={e => setPhone(e.target.value.replace(/\D/g, ""))}
+              placeholder="Numbers only (8–15 digits)"
+              required
+              className="w-full border border-gray-300 px-3 py-2 rounded text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-400"
+            />
+            <p className="text-xs text-gray-700 mt-1">
+              {phone
+                ? "Prefilled from your profile (you can edit)."
+                : "Please provide a contact number for delivery."}
+            </p>
+          </div>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full bg-pink-500 text-white py-2 rounded hover:bg-pink-600 transition disabled:opacity-60"
+          >
+            {submitting ? "Placing Order…" : "Place Order"}
+          </button>
+        </form>
+      </div>
     </div>
   )
 }
