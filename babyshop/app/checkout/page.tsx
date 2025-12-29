@@ -75,7 +75,12 @@ export default function CheckoutPage() {
       email: user.email!,
       address: address.trim(),
       phone: digits,
-      items: [...cart],
+      items: cart.map(item => ({
+        ...item,
+        price: item.price ?? 0,
+        quantity: item.quantity ?? 1,
+        image: item.image ?? "",
+      })),
       timestamp: new Date().toISOString(),
     }
 
@@ -84,7 +89,7 @@ export default function CheckoutPage() {
 
       // Save to Firestore
       await addDoc(collection(db, "orders"), {
-        userId: user.uid,
+        userId: user.uid,   
         email: orderData.email,
         name: orderData.name,
         address: orderData.address,
@@ -92,6 +97,7 @@ export default function CheckoutPage() {
         items: orderData.items,
         createdAt: serverTimestamp(),
       })
+
 
       // Persist to localStorage for /thankyou
       localStorage.setItem("lastOrder", JSON.stringify(orderData))
