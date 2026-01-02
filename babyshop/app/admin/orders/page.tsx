@@ -11,6 +11,8 @@ import {
   where,
   orderBy,
   Timestamp,
+  updateDoc,
+  doc,
 } from "firebase/firestore"
 
 type OrderItem = { name: string; quantity: number }
@@ -21,6 +23,7 @@ type OrderDoc = {
   address: string
   phone?: string
   items: OrderItem[]
+  status?: string
   createdAt?: Timestamp | null
   timestamp?: string
 }
@@ -97,6 +100,7 @@ export default function OrdersPage() {
               address: String(data?.address ?? ""),
               phone: data?.phone ? String(data.phone) : undefined,
               items: Array.isArray(data?.items) ? data.items : [],
+              status: String(data?.status ?? "pending"),
               createdAt: data?.createdAt ?? null,
               timestamp: data?.timestamp ?? null,
             }
@@ -131,6 +135,19 @@ export default function OrdersPage() {
     load()
   }, [user?.uid, user?.email, isAdmin])
 
+  const updateStatus = async (orderId: string, status: string) => {
+    try {
+      await updateDoc(doc(db, "orders", orderId), { status })
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === orderId ? { ...o, status } : o
+        )
+      )
+    } catch {
+      alert("Failed to update status")
+    }
+  }
+
   const fmtDate = (o: OrderDoc) => {
     if (o.createdAt && typeof (o.createdAt as any).toDate === "function")
       return o.createdAt.toDate().toLocaleString()
@@ -164,7 +181,7 @@ export default function OrdersPage() {
             {orders.map((order) => (
               <div
                 key={order.id}
-                className="bg-white/100 border border-pink-100 rounded-lg shadow-md p-5 text-gray-800"
+                className="bg-white border border-pink-100 rounded-lg shadow-md p-5 text-gray-800"
               >
                 <p className="mb-1">
                   <span className="font-semibold text-gray-900">Name:</span>{" "}
@@ -184,8 +201,46 @@ export default function OrdersPage() {
                   {order.phone ?? "—"}
                 </p>
 
-                <p className="text-sm text-gray-700 mb-3">
-                  <span className="font-medium">Date:</span> {fmtDate(order)}
+                <p className="mb-2">
+                  <span className="font-semibold text-gray-900">Status:</span>{" "}
+                  <span
+                    className={
+                      order.status === "delivered"
+                        ? "text-green-600 font-semibold"
+                        : order.status === "shipped"
+                        ? "text-blue-600 font-semibold"
+                        : order.status === "cancelled"
+                        ? "text-red-600 font-semibold"
+                        : "text-orange-600 font-semibold"
+                    }
+                  >
+                    {order.status}
+                  </span>
+                </p>
+
+                {isAdmin && (
+                  <div className="mt-3">
+                    <label className="block text-sm font-medium mb-1">
+                      Change status
+                    </label>
+                    <select
+                      value={order.status}
+                      onChange={(e) =>
+                        updateStatus(order.id, e.target.value)
+                      }
+                      className="border rounded px-2 py-1 text-gray-900"
+                    >
+                      <option value="pending">pending</option>
+                      <option value="shipped">shipped</option>
+                      <option value="delivered">delivered</option>
+                      <option value="cancelled">cancelled</option>
+                    </select>
+                  </div>
+                )}
+
+                <p className="text-sm text-gray-700 mt-3 mb-2">
+                  <span className="font-medium">Date:</span>{" "}
+                  {fmtDate(order)}
                 </p>
 
                 <div>

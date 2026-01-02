@@ -5,21 +5,47 @@ import { useCart } from "../../context/CartContext"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/context/AuthContext"
 import { db } from "@/app/firebase"
-import { doc, getDoc, addDoc, collection, serverTimestamp } from "firebase/firestore"
+import {
+  doc,
+  getDoc,
+  addDoc,
+  collection,
+  serverTimestamp,
+} from "firebase/firestore"
 
-export default function CheckoutPage() {
+import { loadStripe } from "@stripe/stripe-js"
+import {
+  Elements,
+  CardElement,
+  useStripe,
+  useElements,
+} from "@stripe/react-stripe-js"
+
+const stripePromise = loadStripe(
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
+)
+
+/* ---------------- INTERNAL FORM ---------------- */
+
+function CheckoutForm() {
   const { cart, clearCart } = useCart()
   const { user } = useAuth()
   const router = useRouter()
 
+  const stripe = useStripe()
+  const elements = useElements()
+
   const [name, setName] = useState("")
   const [address, setAddress] = useState("")
   const [phone, setPhone] = useState("")
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "card">("cod")
+
   const [nameLocked, setNameLocked] = useState(false)
   const [loadingProfile, setLoadingProfile] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [clientSecret, setClientSecret] = useState<string | null>(null)
 
-  // Load profile from Firestore and prefill fields
+  /* ---------- LOAD PROFILE ---------- */
   useEffect(() => {
     const load = async () => {
       if (!user?.uid) {
@@ -34,15 +60,13 @@ export default function CheckoutPage() {
             address?: string
             phone?: string
           }
-          if (data?.name) {
+          if (data.name) {
             setName(data.name)
             setNameLocked(true)
           }
-          if (data?.address) setAddress(data.address)
-          if (data?.phone) setPhone(String(data.phone).replace(/\D/g, ""))
+          if (data.address) setAddress(data.address)
+          if (data.phone) setPhone(String(data.phone).replace(/\D/g, ""))
         }
-      } catch (e) {
-        console.error("Failed to load profile for checkout:", e)
       } finally {
         setLoadingProfile(false)
       }
@@ -50,49 +74,93 @@ export default function CheckoutPage() {
     load()
   }, [user?.uid])
 
+  /* ---------- CREATE PAYMENT INTENT ---------- */
+  const totalAmount = cart.reduce(
+    (acc, i) => acc + Number(i.price ?? 0) * Number(i.quantity ?? 1),
+    0
+  )
+
+  useEffect(() => {
+    if (paymentMethod !== "card" || clientSecret) return
+
+    const createIntent = async () => {
+      const res = await fetch("/api/create-payment-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: Math.round(totalAmount * 100) }),
+      })
+      const data = await res.json()
+      setClientSecret(data.clientSecret)
+    }
+
+    createIntent()
+  }, [paymentMethod, totalAmount])
+
+  /* ---------- SUBMIT ---------- */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (submitting) return
 
-    if (!user?.email) {
-      alert("Please log in first.")
+    if (!user?.uid || !user?.email) {
       router.push("/login")
       return
     }
 
-    if (!name.trim() || !address.trim()) {
-      alert("❌ Please fill in all fields.")
+    const digits = phone.replace(/\D/g, "")
+    if (!name.trim() || !address.trim() || digits.length < 8) {
+      alert("Please fill all fields correctly.")
       return
     }
 
-    const digits = phone.replace(/\D/g, "")
-    if (!digits) {
-      alert("❌ Please enter your phone number.")
-      return
-    }
-    if (digits.length < 8 || digits.length > 15) {
-      alert("❌ Phone must be 8–15 digits.")
-      return
-    }
-    if (cart.length === 0) {
-      alert("❌ Your cart is empty.")
-      return
-    }
+    let paymentIntentId: string | null = null
 
     try {
       setSubmitting(true)
 
+      /* ---- CARD PAYMENT ---- */
+      if (paymentMethod === "card") {
+        if (!stripe || !elements || !clientSecret) {
+          alert("Payment not ready.")
+          setSubmitting(false)
+          return
+        }
+
+        const result = await stripe.confirmCardPayment(clientSecret, {
+          payment_method: {
+            card: elements.getElement(CardElement)!,
+            billing_details: {
+              name,
+              email: user.email,
+            },
+          },
+        })
+
+        if (result.error || result.paymentIntent?.status !== "succeeded") {
+          alert(result.error?.message || "Payment failed.")
+          setSubmitting(false)
+          return
+        }
+
+        paymentIntentId = result.paymentIntent?.id
+      }
+
+      /* ---- SAVE ORDER ---- */
       await addDoc(collection(db, "orders"), {
         userId: user.uid,
         email: user.email,
         name: name.trim(),
         address: address.trim(),
         phone: digits,
-        items: cart.map(item => ({
-          name: String(item.name ?? ""),
-          price: Number(item.price ?? 0),
-          quantity: Number(item.quantity ?? 1),
-          image: String(item.image ?? ""),
+        paymentMethod,
+        paid: paymentMethod === "card",
+        paymentIntentId, 
+        status: "pending",
+        items: cart.map(i => ({
+          id: String(i.id ?? ""),
+          name: String(i.name ?? ""),
+          price: Number(i.price ?? 0),
+          quantity: Number(i.quantity ?? 1),
+          image: String(i.image ?? ""),
         })),
         createdAt: serverTimestamp(),
       })
@@ -105,15 +173,15 @@ export default function CheckoutPage() {
           address,
           phone: digits,
           items: cart,
+          paymentMethod,
+          paid: paymentMethod === "card",
+          paymentIntentId,
           timestamp: new Date().toISOString(),
         })
       )
 
       clearCart()
       router.push("/thankyou")
-    } catch (err: any) {
-      console.error("Order submission failed:", err)
-      alert(`Order failed: ${err?.message ?? "Unknown error"}`)
     } finally {
       setSubmitting(false)
     }
@@ -121,19 +189,18 @@ export default function CheckoutPage() {
 
   if (loadingProfile) {
     return (
-      <div className="min-h-screen bg-pink-50 flex items-center justify-center">
-        <p className="text-gray-700">Loading your profile…</p>
+      <div className="min-h-screen bg-pink-50 flex items-center justify-center text-gray-900">
+        Loading…
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-pink-50 py-10 px-4">
+    <div className="min-h-screen bg-pink-50 py-10 px-4 text-gray-900">
       <div className="max-w-md mx-auto">
         <button
-          type="button"
           onClick={() => router.back()}
-          className="mb-4 text-pink-600 hover:underline flex items-center"
+          className="mb-4 text-pink-600 hover:underline"
         >
           ← Back
         </button>
@@ -142,93 +209,110 @@ export default function CheckoutPage() {
           Checkout
         </h1>
 
-        {/* OPAQUE FORM CARD */}
         <form
           onSubmit={handleSubmit}
-          className="bg-white/100 text-gray-900 p-6 rounded-lg shadow-md border border-pink-100 space-y-4"
+          className="bg-white p-6 rounded-lg shadow-md border border-pink-100 space-y-4 text-gray-900"
         >
           {/* Name */}
           <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-1">
-              Full Name
-            </label>
+            <label className="block font-semibold mb-1">Full Name</label>
             <input
-              type="text"
-              required
               value={name}
               onChange={e => setName(e.target.value)}
               disabled={nameLocked}
-              readOnly={nameLocked}
-              placeholder="e.g., John Kim"
-              className="w-full border border-gray-300 px-3 py-2 rounded text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-400"
+              className="w-full border px-3 py-2 rounded text-gray-900"
             />
-            {nameLocked ? (
-              <p className="text-xs text-gray-700 mt-1">
-                Using your saved profile name.
-              </p>
-            ) : (
-              <p className="text-xs text-gray-700 mt-1">
-                No saved name found. You can set it on your{" "}
-                <button
-                  type="button"
-                  className="underline text-pink-600"
-                  onClick={() => router.push("/profile")}
-                >
-                  Profile
-                </button>.
-              </p>
-            )}
           </div>
 
           {/* Address */}
           <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-1">
+            <label className="block font-semibold mb-1">
               Shipping Address
             </label>
             <textarea
-              required
               value={address}
               onChange={e => setAddress(e.target.value)}
               rows={3}
-              placeholder="City, district, street, building…"
-              className="w-full border border-gray-300 px-3 py-2 rounded text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-400"
+              className="w-full border px-3 py-2 rounded text-gray-900"
             />
-            <p className="text-xs text-gray-700 mt-1">
-              Prefilled from your profile (you can edit).
-            </p>
           </div>
 
           {/* Phone */}
           <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-1">
-              Phone Number
-            </label>
+            <label className="block font-semibold mb-1">Phone</label>
             <input
-              type="tel"
-              inputMode="numeric"
-              pattern="[0-9]*"
               value={phone}
               onChange={e => setPhone(e.target.value.replace(/\D/g, ""))}
-              placeholder="Numbers only (8–15 digits)"
-              required
-              className="w-full border border-gray-300 px-3 py-2 rounded text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-400"
+              className="w-full border px-3 py-2 rounded text-gray-900"
             />
-            <p className="text-xs text-gray-700 mt-1">
-              {phone
-                ? "Prefilled from your profile (you can edit)."
-                : "Please provide a contact number for delivery."}
-            </p>
           </div>
 
+          {/* Payment Method */}
+          <div className="border rounded p-3">
+            <p className="font-semibold mb-2">Payment Method</p>
+
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                checked={paymentMethod === "cod"}
+                onChange={() => setPaymentMethod("cod")}
+              />
+              Cash on Delivery
+            </label>
+
+            <label className="flex items-center gap-2 mt-2">
+              <input
+                type="radio"
+                checked={paymentMethod === "card"}
+                onChange={() => setPaymentMethod("card")}
+              />
+              Card (Stripe)
+            </label>
+          </div>
+
+          {/* Card UI */}
+          {paymentMethod === "card" && clientSecret && (
+            <div className="border rounded p-3 bg-white">
+              <CardElement
+                options={{
+                  style: {
+                    base: {
+                      color: "#111827",
+                      fontSize: "16px",
+                      "::placeholder": { color: "#9CA3AF" },
+                    },
+                  },
+                }}
+              />
+            </div>
+          )}
+          <div className="text-right font-semibold text-pink-600">
+            Total: ${totalAmount.toFixed(2)}
+          </div>
           <button
             type="submit"
-            disabled={submitting}
-            className="w-full bg-pink-500 text-white py-2 rounded hover:bg-pink-600 transition disabled:opacity-60"
+            disabled={submitting || 
+              (paymentMethod === "card" && (!stripe || !elements || !clientSecret))}
+            className="w-full bg-pink-500 text-white py-2 rounded hover:bg-pink-600"
           >
-            {submitting ? "Placing Order…" : "Place Order"}
+            {submitting
+              ? "Processing…"
+              : paymentMethod === "card"
+              ? "Pay & Place Order"
+              : "Place Order"}
           </button>
         </form>
       </div>
     </div>
+  )
+}
+
+/* ---------------- PAGE WRAPPER ---------------- */
+
+export default function CheckoutPage() {
+  return (
+    <Elements stripe={stripePromise}>
+      <CheckoutForm />
+    </Elements>
   )
 }
