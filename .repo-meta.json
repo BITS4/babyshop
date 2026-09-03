@@ -1,0 +1,6 @@
+{
+  "project_type": "fullstack_web_application",
+  "primary_language": "TypeScript",
+  "framework": "Next.js",
+  "domains": ["ecommerce", "payments", "identity"]
+}
