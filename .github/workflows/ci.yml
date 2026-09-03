@@ -17,45 +17,61 @@ env:
   NEXT_TELEMETRY_DISABLED: "1"
 
 jobs:
-  quality:
-    name: Format, lint, and typecheck
+  format:
+    name: Format
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24.16.0
           cache: npm
-      - name: Install locked dependencies
-        run: npm ci
-      - name: Check formatting
-        run: npm run format:check
-      - name: Run ESLint
+      - run: npm ci
+      - run: npm run format:check
+
+  lint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.16.0
+          cache: npm
+      - run: npm ci
+      - name: Run blocking lint gate
         run: npm run lint
-      - name: Run TypeScript typecheck
+
+  typecheck:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.16.0
+          cache: npm
+      - run: npm ci
+      - name: Run blocking typecheck gate
         run: npm run typecheck
 
-  tests:
-    name: Tests and enforced coverage
+  test:
+    name: Tests and coverage
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24.16.0
           cache: npm
-      - name: Install locked dependencies
-        run: npm ci
-      - name: Run tests with numeric coverage gates
-        run: npm run test:coverage
-      - name: Upload coverage report
-        if: always()
+      - run: npm ci
+      - name: Run test suite with numeric coverage gates
+        run: npm test
+      - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage-${{ github.sha }}
@@ -63,33 +79,45 @@ jobs:
           retention-days: 14
 
   build:
-    name: Production build
+    name: Production build and bundle budget
+    needs: [format, lint, typecheck, test]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24.16.0
           cache: npm
-      - name: Install locked dependencies
-        run: npm ci
-      - name: Build production application
-        run: npm run build
+      - run: npm ci
+      - run: npm run build
+      - name: Enforce static bundle budget
+        run: npm run bundle:size
 
   audit:
-    name: Production dependency audit
+    name: Full dependency audit
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24.16.0
           cache: npm
-      - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+      - run: npm ci
+      - name: Block high-severity production and development advisories
+        run: npm audit --audit-level=high
+
+  dependency-review:
+    name: Dependency vulnerability review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Reject vulnerable dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high

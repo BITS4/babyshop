@@ -8,13 +8,15 @@
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --coverage",
+    "test:unit": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage": "npm test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "audit": "npm audit --omit=dev --audit-level=high",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test:coverage && npm run build"
+    "audit": "npm audit --audit-level=high",
+    "bundle:size": "node scripts/check-bundle-budget.mjs",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build && npm run bundle:size"
   },
   "dependencies": {
     "@heroicons/react": "2.2.0",
