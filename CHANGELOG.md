@@ -4,6 +4,10 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/en/1.1.
 
 ## [Unreleased]
 
+### Changed
+
+- Refreshed Stripe, Tailwind, PostCSS, TypeScript, and React/Node type dependencies after full test and build verification
+
 ## [1.0.0] - 2026-09-03
 
 ### Added
