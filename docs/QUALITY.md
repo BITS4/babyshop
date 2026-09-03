@@ -8,17 +8,17 @@ The following checks are blocking in `.github/workflows/ci.yml`:
 2. Prettier check
 3. ESLint with zero warnings
 4. strict TypeScript typecheck
-5. Vitest with numeric coverage thresholds
+5. Vitest through the standard `npm test` entrypoint with numeric coverage thresholds
 6. Next.js production build
 7. production dependency audit at high severity
 
-CodeQL runs separately on pushes, pull requests, and a weekly schedule.
+Each gate has its own plainly named CI job so GitHub branch protection can require it directly. The production build depends on format, lint, typecheck, and test success. CodeQL runs separately on pushes, pull requests, and a weekly schedule; dependency review blocks vulnerable lockfile changes in pull requests.
 
 ## Coverage scope
 
-The coverage gate targets business and security modules rather than generated files or declarative UI styling. Thresholds are 90% for statements, functions, and lines and 85% for branches. Tests cover success, malformed input, boundary values, missing catalog records, authentication failure, payment mismatch, idempotency, rate limiting, storage corruption, and safe error mapping.
+The coverage gate includes business and security modules plus the profile, checkout, and admin page/component layers. Thresholds are 95% for statements and lines, 91% for functions, and 88% for branches. Tests cover success, malformed input, boundary values, route guards, profile persistence, payment failures, missing catalog records, authentication failure, payment mismatch, idempotency, rate limiting, storage corruption, and safe error mapping. Firebase and Stripe are replaced with deterministic fixtures from `test/mocks`; no cloud account or network access is required.
 
-Every behavior change should update its closest `*.spec.ts` in the same commit. Do not lower a threshold to merge a change. Add a test or explain and review a deliberate exclusion.
+Every behavior change should update its closest `*.spec.ts` or `*.test.tsx` in the same commit. Do not lower a threshold to merge a change. Add a test or explain and review a deliberate exclusion.
 
 ## File discipline
 
