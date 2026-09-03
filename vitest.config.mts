@@ -13,7 +13,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./test/setup.ts"],
-    include: ["**/*.spec.{ts,tsx}"],
+    include: ["**/*.{spec,test}.{ts,tsx}"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json-summary", "lcov"],
@@ -26,8 +26,11 @@ export default defineConfig({
         "lib/observability/metrics.ts",
         "lib/payments/**/*.ts",
         "lib/security/**/*.ts",
+        "lib/profile/**/*.ts",
+        "components/profile/**/*.tsx",
+        "app/profile/page.tsx",
       ],
-      exclude: ["**/*.spec.ts", "**/*.d.ts"],
+      exclude: ["**/*.{spec,test}.{ts,tsx}", "**/*.d.ts", "**/*-repository.ts"],
       thresholds: {
         lines: 90,
         functions: 90,
