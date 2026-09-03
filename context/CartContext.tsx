@@ -1,9 +1,9 @@
 "use client"
 import { createContext, useContext, useEffect, useState, ReactNode } from "react"
 import { useAuth } from "@/context/AuthContext"
-import type { Product } from "../components/ProductCard"
-
-type CartItem = Product & { quantity: number }
+import type { Product } from "@/lib/catalog/product"
+import { addCartItem, type CartItem } from "@/lib/cart/cart"
+import { parseStoredCart, serializeCart } from "@/lib/cart/storage"
 
 type CartContextType = {
   cart: CartItem[]
@@ -14,37 +14,24 @@ type CartContextType = {
 const CartContext = createContext<CartContextType | undefined>(undefined)
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [cart, setCart] = useState<CartItem[]>([])
+  const [cart, setCart] = useState<CartItem[]>(() =>
+    typeof window === "undefined" ? [] : parseStoredCart(localStorage.getItem("cart"))
+  )
   const { user, isLoading } = useAuth()
 
   useEffect(() => {
-    const saved = localStorage.getItem("cart")
-    if (saved) {
-      setCart(JSON.parse(saved))
-    }
-  }, [])
-
-  useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify(cart))
+    localStorage.setItem("cart", serializeCart(cart))
   }, [cart])
 
   useEffect(() => {
     if (!isLoading && !user) {
-      setCart([])
-      try { localStorage.removeItem("cart") } catch {}
+      queueMicrotask(() => setCart([]))
+      localStorage.removeItem("cart")
     }
   }, [user, isLoading])
 
   const addToCart = (product: Product) => {
-    setCart(prev => {
-      const exists = prev.find(item => item.id === product.id)
-      if (exists) {
-        return prev.map(item =>
-          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-        )
-      }
-      return [...prev, { ...product, quantity: 1 }]
-    })
+    setCart((previous) => addCartItem(previous, product))
   }
 
   return (

@@ -1,106 +1,97 @@
 "use client"
-import { createContext, useContext, useState, ReactNode, useEffect, useRef } from "react"
-import type { Product } from "../components/ProductCard"
 
-// Firestore
-import { db } from "@/app/firebase"
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react"
 import {
-  addDoc, collection, deleteDoc, doc, onSnapshot,
-  query, where, getDocs, updateDoc, serverTimestamp, orderBy
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
 } from "firebase/firestore"
+import { db } from "@/app/firebase"
+import { normalizeProductInput, parseProductDocument, type Product } from "@/lib/catalog/product"
+import { reportClientError } from "@/lib/observability/client"
+import { errorMessage } from "@/lib/security/errors"
 
 type ProductContextType = {
   products: Product[]
   addProduct: (product: Omit<Product, "id">) => Promise<void>
   updateProduct: (product: Product) => Promise<void>
   deleteProduct: (id: number) => Promise<void>
-  setProducts: React.Dispatch<React.SetStateAction<Product[]>> // kept for compatibility
+  setProducts: React.Dispatch<React.SetStateAction<Product[]>>
 }
 
 const ProductContext = createContext<ProductContextType | undefined>(undefined)
 
 export function ProductProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>([])
-  const idToDoc = useRef<Record<number, string>>({})
+  const idToDocument = useRef<Record<number, string>>({})
 
   useEffect(() => {
-    const col = collection(db, "products")
-    const q = query(col, orderBy("createdAt", "desc"))
-    const unsub = onSnapshot(q, (snap) => {
-      const list: Product[] = []
-      const map: Record<number, string> = {}
-      snap.forEach(d => {
-        const data = d.data() as any
-        const localId = Number(data?.localId)
-        if (!localId) return
-        list.push({
-          id: localId,
-          name: String(data?.name ?? ""),
-          description: String(data?.description ?? ""),
-          price: Number(data?.price ?? 0),
-          image: String(data?.image ?? ""),
-          category: typeof data?.category === "string" ? data.category : undefined, // ← NEW
+    const productQuery = query(collection(db, "products"), orderBy("createdAt", "desc"))
+    return onSnapshot(
+      productQuery,
+      (snapshot) => {
+        const list: Product[] = []
+        const documentMap: Record<number, string> = {}
+        snapshot.forEach((document) => {
+          const product = parseProductDocument(document.data())
+          if (!product) return
+          list.push(product)
+          documentMap[product.id] = document.id
         })
-        map[localId] = d.id
-      })
-      idToDoc.current = map
-      setProducts(list)
-    }, (err) => {
-      console.error("products snapshot error:", err)
-      setProducts([])
-    })
-    return () => unsub()
+        idToDocument.current = documentMap
+        setProducts(list)
+      },
+      (error) => {
+        reportClientError(error, { operation: "products_snapshot" })
+        setProducts([])
+      }
+    )
   }, [])
 
   const addProduct = async (product: Omit<Product, "id">) => {
     try {
-      const localId = Date.now()
       await addDoc(collection(db, "products"), {
-        localId,
-        name: product.name,
-        description: product.description,
-        price: product.price,
-        image: product.image,
-        category: product.category ?? "uncategorized", // ← NEW
+        localId: Date.now(),
+        ...normalizeProductInput(product),
         createdAt: serverTimestamp(),
       })
-    } catch (e: any) {
-      console.error("addProduct error:", e)
-      alert(e?.code ?? e?.message ?? "Failed to add product")
-      throw e
+    } catch (error: unknown) {
+      reportClientError(error, { operation: "add_product" })
+      alert(errorMessage(error, "Failed to add product"))
+      throw error
     }
+  }
+
+  const findDocumentId = async (id: number) => {
+    const cached = idToDocument.current[id]
+    if (cached) return cached
+    const snapshot = await getDocs(query(collection(db, "products"), where("localId", "==", id)))
+    return snapshot.docs[0]?.id
   }
 
   const updateProduct = async (product: Product) => {
-    let docId = idToDoc.current[product.id]
-    if (!docId) {
-      const q = query(collection(db, "products"), where("localId", "==", product.id))
-      const snap = await getDocs(q)
-      docId = snap.docs[0]?.id
-    }
-    if (!docId) throw new Error("Product not found")
-    await updateDoc(doc(db, "products", docId), {
-      name: product.name,
-      description: product.description,
-      price: product.price,
-      image: product.image,
-      category: product.category ?? "uncategorized", // ← NEW
-    })
+    const documentId = await findDocumentId(product.id)
+    if (!documentId) throw new Error("Product not found")
+    await updateDoc(doc(db, "products", documentId), normalizeProductInput(product))
   }
 
   const deleteProduct = async (id: number) => {
-    let docId = idToDoc.current[id]
-    if (!docId) {
-      const q = query(collection(db, "products"), where("localId", "==", id))
-      const snap = await getDocs(q)
-      docId = snap.docs[0]?.id
-    }
-    if (!docId) return
-    await deleteDoc(doc(db, "products", docId))
+    const documentId = await findDocumentId(id)
+    if (documentId) await deleteDoc(doc(db, "products", documentId))
   }
 
   return (
-    <ProductContext.Provider value={{ products, addProduct, updateProduct, deleteProduct, setProducts }}>
+    <ProductContext.Provider
+      value={{ products, addProduct, updateProduct, deleteProduct, setProducts }}
+    >
       {children}
     </ProductContext.Provider>
   )

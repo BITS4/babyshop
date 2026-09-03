@@ -8,24 +8,21 @@ export default function CartPage() {
   const { cart } = useCart()
   const router = useRouter()
 
-  const getTotal = () =>
-    cart.reduce((acc, item) => acc + item.price * item.quantity, 0).toFixed(2)
+  const getTotal = () => cart.reduce((acc, item) => acc + item.price * item.quantity, 0).toFixed(2)
 
   return (
-    <div className="min-h-screen bg-pink-50 py-10 px-4">
-      <div className="max-w-2xl mx-auto">
+    <div className="min-h-screen bg-pink-50 px-4 py-10">
+      <div className="mx-auto max-w-2xl">
         {/* Back Button */}
         <button
           type="button"
           onClick={() => router.back()}
-          className="mb-4 text-pink-600 hover:underline flex items-center"
+          className="mb-4 flex items-center text-pink-600 hover:underline"
         >
           ← Back
         </button>
 
-        <h1 className="text-3xl font-bold text-center text-pink-600 mb-6">
-          Your Cart
-        </h1>
+        <h1 className="mb-6 text-center text-3xl font-bold text-pink-600">Your Cart</h1>
 
         {cart.length === 0 ? (
           <p className="text-center text-gray-700">
@@ -36,15 +33,13 @@ export default function CartPage() {
           </p>
         ) : (
           <div className="space-y-4">
-            {cart.map(item => (
+            {cart.map((item) => (
               <div
                 key={item.id}
-                className="bg-white/100 text-gray-900 p-4 rounded-lg shadow-md border border-pink-100 flex justify-between items-center"
+                className="flex items-center justify-between rounded-lg border border-pink-100 bg-white/100 p-4 text-gray-900 shadow-md"
               >
                 <div>
-                  <h2 className="font-semibold text-gray-900">
-                    {item.name}
-                  </h2>
+                  <h2 className="font-semibold text-gray-900">{item.name}</h2>
                   <p className="text-sm text-gray-700">
                     {item.quantity} × ${item.price.toFixed(2)}
                   </p>
@@ -56,13 +51,11 @@ export default function CartPage() {
               </div>
             ))}
 
-            <div className="text-right pt-4 border-t border-pink-100 mt-6">
-              <p className="text-lg font-bold text-gray-900">
-                Total: ${getTotal()}
-              </p>
+            <div className="mt-6 border-t border-pink-100 pt-4 text-right">
+              <p className="text-lg font-bold text-gray-900">Total: ${getTotal()}</p>
 
               <Link href="/checkout">
-                <button className="mt-3 bg-pink-500 text-white px-6 py-2 rounded hover:bg-pink-600 transition">
+                <button className="mt-3 rounded bg-pink-500 px-6 py-2 text-white transition hover:bg-pink-600">
                   Checkout
                 </button>
               </Link>
