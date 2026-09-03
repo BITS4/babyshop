@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   loadProfile: vi.fn(),
   saveProfile: vi.fn(),
   updateCurrentUserAvatar: vi.fn(),
+  reportClientError: vi.fn(),
   authState: {} as Record<string, unknown>,
 }))
 
@@ -20,7 +21,7 @@ vi.mock("@/lib/profile/profile-repository", () => ({
   saveProfile: mocks.saveProfile,
   updateCurrentUserAvatar: mocks.updateCurrentUserAvatar,
 }))
-vi.mock("@/lib/observability/client", () => ({ reportClientError: vi.fn() }))
+vi.mock("@/lib/observability/client", () => ({ reportClientError: mocks.reportClientError }))
 
 import ProfilePage from "./page"
 
@@ -77,5 +78,49 @@ describe("ProfilePage", () => {
       "parent@example.com",
       expect.objectContaining({ photoURL: expect.stringContaining("data:image/svg+xml") })
     )
+  })
+
+  it("rejects incomplete profile values before persistence", async () => {
+    const alert = vi.spyOn(window, "alert").mockImplementation(() => undefined)
+    render(<ProfilePage />)
+    await screen.findByDisplayValue("Parent")
+    fireEvent.change(screen.getByLabelText("Default shipping address"), { target: { value: "" } })
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }))
+    expect(alert).toHaveBeenCalledWith("Enter a complete shipping address.")
+    expect(mocks.saveProfile).not.toHaveBeenCalled()
+  })
+
+  it("removes a persisted avatar after confirmation", async () => {
+    mocks.loadProfile.mockResolvedValue({
+      name: "Parent",
+      address: "12 Family Street",
+      phone: "12345678",
+      photoURL: "avatar",
+    })
+    vi.spyOn(window, "confirm").mockReturnValue(true)
+    render(<ProfilePage />)
+    await screen.findByRole("button", { name: "Remove" })
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }))
+    await waitFor(() => expect(mocks.updateCurrentUserAvatar).toHaveBeenCalledWith(""))
+    expect(screen.getByRole("status")).toHaveTextContent("Avatar removed")
+  })
+
+  it("reports profile persistence failures without losing the form", async () => {
+    mocks.saveProfile.mockRejectedValue(new Error("Storage unavailable"))
+    const alert = vi.spyOn(window, "alert").mockImplementation(() => undefined)
+    render(<ProfilePage />)
+    await screen.findByDisplayValue("Parent")
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }))
+    await waitFor(() => expect(alert).toHaveBeenCalledWith("Storage unavailable"))
+    expect(mocks.reportClientError).toHaveBeenCalled()
+  })
+
+  it("delegates navigation and sign-out controls", async () => {
+    render(<ProfilePage />)
+    await screen.findByDisplayValue("Parent")
+    fireEvent.click(screen.getByRole("button", { name: "← Back" }))
+    fireEvent.click(screen.getByRole("button", { name: "Logout" }))
+    expect(mocks.back).toHaveBeenCalledOnce()
+    expect(mocks.logout).toHaveBeenCalledOnce()
   })
 })
