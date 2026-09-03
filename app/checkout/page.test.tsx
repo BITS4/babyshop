@@ -1,5 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { createMockFirebaseUser } from "@/test/mocks/firebase"
+import { createStripeMock } from "@/test/mocks/stripe"
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
@@ -62,11 +64,7 @@ describe("CheckoutPage", () => {
     vi.clearAllMocks()
     mocks.clientSecret = null
     mocks.paymentError = ""
-    mocks.user = {
-      uid: "user-1",
-      email: "parent@example.com",
-      getIdToken: vi.fn().mockResolvedValue("token"),
-    }
+    mocks.user = createMockFirebaseUser({ uid: "user-1" })
     mocks.loadProfile.mockResolvedValue({
       name: "Parent",
       address: "12 Family Street",
@@ -74,9 +72,7 @@ describe("CheckoutPage", () => {
       photoURL: "",
     })
     mocks.submitOrder.mockResolvedValue(undefined)
-    mocks.confirmCardPayment.mockResolvedValue({
-      paymentIntent: { id: "pi_1", status: "succeeded" },
-    })
+    mocks.confirmCardPayment.mockImplementation(createStripeMock().confirmCardPayment)
   })
 
   it("loads a profile and places a server-verified cash order", async () => {
@@ -117,7 +113,7 @@ describe("CheckoutPage", () => {
       expect(mocks.confirmCardPayment).toHaveBeenCalledWith("secret", expect.anything())
     )
     expect(mocks.submitOrder).toHaveBeenCalledWith(
-      expect.objectContaining({ paymentIntentId: "pi_1" })
+      expect.objectContaining({ paymentIntentId: "pi_test" })
     )
   })
 

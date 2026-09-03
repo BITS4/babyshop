@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { createMockFirebaseUser } from "@/test/mocks/firebase"
 
 const mocks = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -29,7 +30,7 @@ describe("ProfilePage", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.authState = {
-      user: { uid: "user-1", email: "parent@example.com", photoURL: "" },
+      user: createMockFirebaseUser({ uid: "user-1", photoURL: "" }),
       logout: mocks.logout,
       isLoading: false,
       isVerified: true,

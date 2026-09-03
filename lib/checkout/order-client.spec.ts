@@ -35,13 +35,11 @@ describe("order client", () => {
   })
 
   it("surfaces a structured API failure", async () => {
-    const fetcher = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(JSON.stringify({ error: { message: "Payment not verified" } }), {
-          status: 422,
-        })
-      )
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: { message: "Payment not verified" } }), {
+        status: 422,
+      })
+    )
     await expect(submitOrder({ ...options, fetcher })).rejects.toThrow("Payment not verified")
   })
 
