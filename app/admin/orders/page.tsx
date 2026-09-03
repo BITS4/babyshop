@@ -10,38 +10,25 @@ import {
   query,
   where,
   orderBy,
-  Timestamp,
   updateDoc,
   doc,
+  type DocumentData,
+  type QueryDocumentSnapshot,
 } from "firebase/firestore"
-
-type OrderItem = { name: string; quantity: number }
-type OrderDoc = {
-  id: string
-  name: string
-  email: string
-  address: string
-  phone?: string
-  items: OrderItem[]
-  status?: string
-  createdAt?: Timestamp | null
-  timestamp?: string
-}
+import { parseOrderDocument, sortOrdersNewestFirst, type Order } from "@/lib/orders/order"
+import { reportClientError } from "@/lib/observability/client"
 
 export default function OrdersPage() {
-  const { user, isLoading } = useAuth()
+  const { user, isLoading, isAdmin, isClaimsLoading } = useAuth()
   const router = useRouter()
-  const [orders, setOrders] = useState<OrderDoc[]>([])
+  const [orders, setOrders] = useState<Order[]>([])
   const [loadingOrders, setLoadingOrders] = useState(true)
-
-  const isAdmin =
-    (user?.email || "").toLowerCase() === "vazirpirov15@gmail.com"
 
   // must be signed in
   useEffect(() => {
-    if (isLoading) return
+    if (isLoading || isClaimsLoading) return
     if (!user) router.push("/login")
-  }, [user, isLoading, router])
+  }, [user, isLoading, isClaimsLoading, router])
 
   useEffect(() => {
     const load = async () => {
@@ -52,80 +39,43 @@ export default function OrdersPage() {
 
       try {
         const colRef = collection(db, "orders")
-        let docs: any[] = []
+        let documents: QueryDocumentSnapshot<DocumentData>[] = []
 
         if (isAdmin) {
           try {
-            const snap = await getDocs(
-              query(colRef, orderBy("createdAt", "desc"))
-            )
-            docs = snap.docs
+            const snap = await getDocs(query(colRef, orderBy("createdAt", "desc")))
+            documents = snap.docs
           } catch {
             const snap = await getDocs(colRef)
-            docs = snap.docs
+            documents = snap.docs
           }
         } else {
           let snap
           try {
             snap = await getDocs(
-              query(
-                colRef,
-                where("userId", "==", user.uid),
-                orderBy("createdAt", "desc")
-              )
+              query(colRef, where("userId", "==", user.uid), orderBy("createdAt", "desc"))
             )
           } catch {
-            snap = await getDocs(
-              query(colRef, where("userId", "==", user.uid))
-            )
+            snap = await getDocs(query(colRef, where("userId", "==", user.uid)))
           }
 
           if (!snap.empty) {
-            docs = snap.docs
+            documents = snap.docs
           } else {
-            const byEmail = await getDocs(
-              query(colRef, where("email", "==", user.email))
-            )
-            docs = !byEmail.empty ? byEmail.docs : []
+            const byEmail = await getDocs(query(colRef, where("email", "==", user.email)))
+            documents = !byEmail.empty ? byEmail.docs : []
           }
         }
 
-        const list: OrderDoc[] = docs
-          .map((d) => {
-            const data = d.data() as any
-            return {
-              id: d.id,
-              name: String(data?.name ?? ""),
-              email: String(data?.email ?? ""),
-              address: String(data?.address ?? ""),
-              phone: data?.phone ? String(data.phone) : undefined,
-              items: Array.isArray(data?.items) ? data.items : [],
-              status: String(data?.status ?? "pending"),
-              createdAt: data?.createdAt ?? null,
-              timestamp: data?.timestamp ?? null,
-            }
-          })
-          .sort((a, b) => {
-            const aMs =
-              a.createdAt && typeof (a.createdAt as any).toMillis === "function"
-                ? (a.createdAt as any).toMillis()
-                : a.timestamp
-                ? new Date(a.timestamp).getTime()
-                : 0
-
-            const bMs =
-              b.createdAt && typeof (b.createdAt as any).toMillis === "function"
-                ? (b.createdAt as any).toMillis()
-                : b.timestamp
-                ? new Date(b.timestamp).getTime()
-                : 0
-
-            return bMs - aMs
-          })
+        const list = sortOrdersNewestFirst(
+          documents
+            .map((document) => parseOrderDocument(document.id, document.data()))
+            .filter((order): order is Order => order !== null)
+        )
 
         setOrders(list)
-      } catch (e) {
-        console.error("Failed to load orders:", e)
+      } catch (error: unknown) {
+        reportClientError(error, { operation: "load_orders" })
         setOrders([])
       } finally {
         setLoadingOrders(false)
@@ -135,42 +85,35 @@ export default function OrdersPage() {
     load()
   }, [user?.uid, user?.email, isAdmin])
 
-  const updateStatus = async (orderId: string, status: string) => {
+  const updateStatus = async (orderId: string, status: Order["status"]) => {
     try {
       await updateDoc(doc(db, "orders", orderId), { status })
-      setOrders((prev) =>
-        prev.map((o) =>
-          o.id === orderId ? { ...o, status } : o
-        )
-      )
+      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)))
     } catch {
       alert("Failed to update status")
     }
   }
 
-  const fmtDate = (o: OrderDoc) => {
-    if (o.createdAt && typeof (o.createdAt as any).toDate === "function")
-      return o.createdAt.toDate().toLocaleString()
+  const fmtDate = (o: Order) => {
+    if (o.createdAt) return o.createdAt.toDate().toLocaleString()
     if (o.timestamp) return new Date(o.timestamp).toLocaleString()
     return ""
   }
 
-  if (isLoading || !user) return null
+  if (isLoading || isClaimsLoading || !user) return null
 
   return (
-    <div className="min-h-screen bg-pink-50 py-10 px-4">
-      <div className="max-w-3xl mx-auto">
+    <div className="min-h-screen bg-pink-50 px-4 py-10">
+      <div className="mx-auto max-w-3xl">
         <button
           type="button"
           onClick={() => router.back()}
-          className="mb-4 text-pink-600 hover:underline flex items-center"
+          className="mb-4 flex items-center text-pink-600 hover:underline"
         >
           ← Back
         </button>
 
-        <h1 className="text-3xl font-bold text-center text-pink-600 mb-8">
-          Orders
-        </h1>
+        <h1 className="mb-8 text-center text-3xl font-bold text-pink-600">Orders</h1>
 
         {loadingOrders ? (
           <p className="text-center text-gray-700">Loading orders…</p>
@@ -181,24 +124,20 @@ export default function OrdersPage() {
             {orders.map((order) => (
               <div
                 key={order.id}
-                className="bg-white border border-pink-100 rounded-lg shadow-md p-5 text-gray-800"
+                className="rounded-lg border border-pink-100 bg-white p-5 text-gray-800 shadow-md"
               >
                 <p className="mb-1">
-                  <span className="font-semibold text-gray-900">Name:</span>{" "}
-                  {order.name}
+                  <span className="font-semibold text-gray-900">Name:</span> {order.name}
                 </p>
                 <p className="mb-1">
-                  <span className="font-semibold text-gray-900">Email:</span>{" "}
-                  {order.email}
+                  <span className="font-semibold text-gray-900">Email:</span> {order.email}
                 </p>
                 <p className="mb-1">
-                  <span className="font-semibold text-gray-900">Address:</span>{" "}
-                  {order.address}
+                  <span className="font-semibold text-gray-900">Address:</span> {order.address}
                 </p>
 
                 <p className="mb-2">
-                  <span className="font-semibold text-gray-900">Phone:</span>{" "}
-                  {order.phone ?? "—"}
+                  <span className="font-semibold text-gray-900">Phone:</span> {order.phone ?? "—"}
                 </p>
 
                 <p className="mb-2">
@@ -206,12 +145,12 @@ export default function OrdersPage() {
                   <span
                     className={
                       order.status === "delivered"
-                        ? "text-green-600 font-semibold"
+                        ? "font-semibold text-green-600"
                         : order.status === "shipped"
-                        ? "text-blue-600 font-semibold"
-                        : order.status === "cancelled"
-                        ? "text-red-600 font-semibold"
-                        : "text-orange-600 font-semibold"
+                          ? "font-semibold text-blue-600"
+                          : order.status === "cancelled"
+                            ? "font-semibold text-red-600"
+                            : "font-semibold text-orange-600"
                     }
                   >
                     {order.status}
@@ -220,15 +159,11 @@ export default function OrdersPage() {
 
                 {isAdmin && (
                   <div className="mt-3">
-                    <label className="block text-sm font-medium mb-1">
-                      Change status
-                    </label>
+                    <label className="mb-1 block text-sm font-medium">Change status</label>
                     <select
                       value={order.status}
-                      onChange={(e) =>
-                        updateStatus(order.id, e.target.value)
-                      }
-                      className="border rounded px-2 py-1 text-gray-900"
+                      onChange={(e) => updateStatus(order.id, e.target.value as Order["status"])}
+                      className="rounded border px-2 py-1 text-gray-900"
                     >
                       <option value="pending">pending</option>
                       <option value="shipped">shipped</option>
@@ -238,14 +173,13 @@ export default function OrdersPage() {
                   </div>
                 )}
 
-                <p className="text-sm text-gray-700 mt-3 mb-2">
-                  <span className="font-medium">Date:</span>{" "}
-                  {fmtDate(order)}
+                <p className="mt-3 mb-2 text-sm text-gray-700">
+                  <span className="font-medium">Date:</span> {fmtDate(order)}
                 </p>
 
                 <div>
-                  <p className="font-semibold text-gray-900 mb-1">Items:</p>
-                  <ul className="list-disc list-inside text-gray-800">
+                  <p className="mb-1 font-semibold text-gray-900">Items:</p>
+                  <ul className="list-inside list-disc text-gray-800">
                     {order.items.map((item, i) => (
                       <li key={i}>
                         {item.name} × {item.quantity}

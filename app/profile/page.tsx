@@ -1,18 +1,19 @@
 "use client"
+/* eslint-disable @next/next/no-img-element -- preset avatars are inline SVG data URLs */
 
 import { useAuth } from "@/context/AuthContext"
 import { useRouter } from "next/navigation"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { doc, setDoc, getDoc } from "firebase/firestore"
 import { db, auth } from "@/app/firebase"
 import { updateProfile } from "firebase/auth"
+import { reportClientError } from "@/lib/observability/client"
+import { errorMessage } from "@/lib/security/errors"
 
 // ------- Cute avatar presets (SVG -> data URL) -------
 const svg = (body: string) =>
   "data:image/svg+xml;utf8," +
-  encodeURIComponent(
-    `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'>${body}</svg>`
-  )
+  encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'>${body}</svg>`)
 
 const AVATARS = [
   {
@@ -152,7 +153,12 @@ export default function ProfilePage() {
       try {
         const snap = await getDoc(doc(db, "users", user.uid))
         if (snap.exists()) {
-          const data = snap.data() as { name?: string; address?: string; phone?: string; photoURL?: string }
+          const data = snap.data() as {
+            name?: string
+            address?: string
+            phone?: string
+            photoURL?: string
+          }
           setName(data?.name || "")
           setAddress(data?.address || "")
           setPhone(data?.phone ? String(data.phone).replace(/\D/g, "") : "")
@@ -160,14 +166,14 @@ export default function ProfilePage() {
         } else {
           setAvatarUrl(user.photoURL || "")
         }
-      } catch (error) {
-        console.error("Failed to load profile:", error)
+      } catch (error: unknown) {
+        reportClientError(error, { operation: "load_profile" })
       }
     }
     loadProfile()
-  }, [user?.uid, user?.photoURL])
+  }, [user])
 
-  const saveProfileCore = async (partial: Record<string, any>) => {
+  const saveProfileCore = async (partial: Record<string, unknown>) => {
     if (!user?.uid) return
     await setDoc(
       doc(db, "users", user.uid),
@@ -195,9 +201,9 @@ export default function ProfilePage() {
       })
       setSavedMsg("Profile saved ✅")
       setTimeout(() => setSavedMsg(""), 1600)
-    } catch (err) {
-      console.error("[Profile] setDoc ERROR:", err)
-      alert("Save failed. Check console for details.")
+    } catch (error: unknown) {
+      reportClientError(error, { operation: "save_profile" })
+      alert(errorMessage(error, "Save failed."))
     }
   }
 
@@ -213,7 +219,7 @@ export default function ProfilePage() {
       setPickerOpen(false)
       setSavedMsg("Avatar updated ✅")
       setTimeout(() => setSavedMsg(""), 1600)
-    } catch (e) {
+    } catch {
       alert("Could not update avatar.")
     } finally {
       setBusy(false)
@@ -232,7 +238,7 @@ export default function ProfilePage() {
       }
       setSavedMsg("Avatar removed ✅")
       setTimeout(() => setSavedMsg(""), 1600)
-    } catch (e) {
+    } catch {
       alert("Could not remove avatar.")
     } finally {
       setBusy(false)
@@ -247,7 +253,7 @@ export default function ProfilePage() {
         <button
           type="button"
           onClick={() => router.back()}
-          className="text-sm text-pink-600 hover:text-pink-700 transition"
+          className="text-sm text-pink-600 transition hover:text-pink-700"
         >
           ← Back
         </button>
@@ -274,9 +280,7 @@ export default function ProfilePage() {
                   <span className="text-neutral-600">{user?.email}</span>
                   <span
                     className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                      isVerified
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
+                      isVerified ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
                     }`}
                   >
                     {isVerified ? "Verified" : "Not verified"}
@@ -285,9 +289,9 @@ export default function ProfilePage() {
 
                 <div className="mt-2 flex items-center gap-2">
                   <button
-                    onClick={() => setPickerOpen(v => !v)}
+                    onClick={() => setPickerOpen((v) => !v)}
                     disabled={busy}
-                    className="rounded-lg border border-neutral-300 px-3 py-1 text-sm hover:bg-neutral-50 active:scale-95 transition"
+                    className="rounded-lg border border-neutral-300 px-3 py-1 text-sm transition hover:bg-neutral-50 active:scale-95"
                   >
                     {pickerOpen ? "Close Picker" : "Choose Avatar"}
                   </button>
@@ -295,21 +299,19 @@ export default function ProfilePage() {
                     <button
                       onClick={removeAvatar}
                       disabled={busy}
-                      className="rounded-lg border border-red-300 text-red-700 px-3 py-1 text-sm hover:bg-red-50 active:scale-95 transition"
+                      className="rounded-lg border border-red-300 px-3 py-1 text-sm text-red-700 transition hover:bg-red-50 active:scale-95"
                     >
                       Remove
                     </button>
                   ) : null}
                 </div>
-                {savedMsg && (
-                  <p className="mt-2 text-sm text-green-700">{savedMsg}</p>
-                )}
+                {savedMsg && <p className="mt-2 text-sm text-green-700">{savedMsg}</p>}
               </div>
             </div>
 
             <button
               onClick={logout}
-              className="rounded-xl bg-red-500 px-4 py-2 text-white shadow hover:bg-red-600 active:scale-[.98] transition"
+              className="rounded-xl bg-red-500 px-4 py-2 text-white shadow transition hover:bg-red-600 active:scale-[.98]"
             >
               Logout
             </button>
@@ -322,24 +324,22 @@ export default function ProfilePage() {
                 Pick your character
               </h3>
               <div className="grid grid-cols-4 gap-3 sm:grid-cols-8">
-                {AVATARS.map(a => (
+                {AVATARS.map((a) => (
                   <button
                     key={a.id}
                     onClick={() => chooseAvatar(a.url)}
                     disabled={busy}
-                    className={`relative rounded-xl p-1 border ${
-                      avatarUrl === a.url ? "border-pink-500 ring-2 ring-pink-300" : "border-neutral-200"
-                    } hover:shadow-sm active:scale-95 transition`}
+                    className={`relative rounded-xl border p-1 ${
+                      avatarUrl === a.url
+                        ? "border-pink-500 ring-2 ring-pink-300"
+                        : "border-neutral-200"
+                    } transition hover:shadow-sm active:scale-95`}
                     title={a.label}
                     aria-label={`Choose ${a.label}`}
                   >
-                    <img
-                      src={a.url}
-                      alt={a.label}
-                      className="h-16 w-16 rounded-lg object-cover"
-                    />
+                    <img src={a.url} alt={a.label} className="h-16 w-16 rounded-lg object-cover" />
                     {avatarUrl === a.url && (
-                      <span className="absolute -top-2 -right-2 text-xs bg-pink-500 text-white px-1.5 py-0.5 rounded-full">
+                      <span className="absolute -top-2 -right-2 rounded-full bg-pink-500 px-1.5 py-0.5 text-xs text-white">
                         ✓
                       </span>
                     )}
@@ -358,7 +358,7 @@ export default function ProfilePage() {
               <div className="space-y-3 rounded-xl border border-neutral-200 bg-white px-4 py-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-neutral-600">Email</span>
-                  <span className="text-sm font-medium text-neutral-900 truncate max-w-[60%] text-right">
+                  <span className="max-w-[60%] truncate text-right text-sm font-medium text-neutral-900">
                     {user?.email}
                   </span>
                 </div>
@@ -376,15 +376,13 @@ export default function ProfilePage() {
               </h2>
 
               <div className="rounded-xl border border-neutral-200 bg-white p-5">
-                <label className="block text-sm font-medium text-neutral-800">
-                  Full Name
-                </label>
+                <label className="block text-sm font-medium text-neutral-800">Full Name</label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g., John Kim"
-                  className="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                  className="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-neutral-900 placeholder-neutral-400 focus:ring-2 focus:ring-pink-400 focus:outline-none"
                 />
 
                 <label className="mt-4 block text-sm font-medium text-neutral-800">
@@ -395,7 +393,7 @@ export default function ProfilePage() {
                   onChange={(e) => setAddress(e.target.value)}
                   placeholder="City, district, street, building…"
                   rows={3}
-                  className="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                  className="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-neutral-900 placeholder-neutral-400 focus:ring-2 focus:ring-pink-400 focus:outline-none"
                 />
 
                 <label className="mt-4 block text-sm font-medium text-neutral-800">
@@ -408,20 +406,18 @@ export default function ProfilePage() {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
                   placeholder="Numbers only (8–15 digits)"
-                  className="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                  className="mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-neutral-900 placeholder-neutral-400 focus:ring-2 focus:ring-pink-400 focus:outline-none"
                 />
                 <p className="mt-1 text-xs text-neutral-500">
                   We store digits only (no spaces or symbols).
                 </p>
-                {savedMsg && (
-                  <p className="mt-3 text-sm text-green-700">{savedMsg}</p>
-                )}
+                {savedMsg && <p className="mt-3 text-sm text-green-700">{savedMsg}</p>}
                 <div className="mt-5 flex items-center gap-3">
                   <button
                     type="button"
                     onClick={handleSave}
                     disabled={busy}
-                    className="inline-flex items-center justify-center rounded-xl bg-pink-500 px-4 py-2 text-white shadow hover:bg-pink-600 active:scale-[.98] transition"
+                    className="inline-flex items-center justify-center rounded-xl bg-pink-500 px-4 py-2 text-white shadow transition hover:bg-pink-600 active:scale-[.98]"
                   >
                     Save Changes
                   </button>

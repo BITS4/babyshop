@@ -4,13 +4,12 @@ import { getFirestore } from "firebase/firestore"
 import { getStorage } from "firebase/storage"
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBQu8gOXraUfeUULWxURjStitp82poKIAA",
-  authDomain: "shop-auth-2825f.firebaseapp.com",
-  projectId: "shop-auth-2825f",
-  storageBucket: "shop-auth-2825f.appspot.com",  
-  messagingSenderId: "199284273979",
-  appId: "1:199284273979:web:f834117c72e052eb01bd1e",
-  measurementId: "G-HBMR6Y2E11",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "demo-api-key",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? "demo-babyshop.firebaseapp.com",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? "demo-babyshop",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? "demo-babyshop.appspot.com",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? "000000000000",
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? "1:000000000000:web:demo",
 }
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig)

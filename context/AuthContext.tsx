@@ -1,5 +1,5 @@
 "use client"
-import { createContext, useContext, useEffect, useState, ReactNode } from "react"
+import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react"
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -12,10 +12,13 @@ import {
   User,
 } from "firebase/auth"
 import { auth } from "@/app/firebase"
+import { credentialsSchema, emailSchema } from "@/lib/auth/credentials"
 
 type AuthContextType = {
   user: User | null
   isVerified: boolean
+  isAdmin: boolean
+  isClaimsLoading: boolean
   isLoading: boolean
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string) => Promise<void>
@@ -29,9 +32,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [isClaimsLoading, setIsClaimsLoading] = useState(true)
 
   // Helper: force-refresh current user from Firebase
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     try {
       const cu = auth.currentUser
       if (cu) {
@@ -42,7 +47,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore reload errors
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    queueMicrotask(() => active && setIsClaimsLoading(true))
+    if (!user) {
+      queueMicrotask(() => {
+        if (active) {
+          setIsAdmin(false)
+          setIsClaimsLoading(false)
+        }
+      })
+      return () => {
+        active = false
+      }
+    }
+
+    void user
+      .getIdTokenResult()
+      .then((token) => {
+        if (active) {
+          setIsAdmin(token.claims.admin === true)
+          setIsClaimsLoading(false)
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setIsAdmin(false)
+          setIsClaimsLoading(false)
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [user])
 
   // 1) Initialize auth and eagerly reload once so emailVerified is accurate
   useEffect(() => {
@@ -72,25 +112,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) return
 
-    const onFocus = () => { void refreshUser() }
+    const onFocus = () => {
+      void refreshUser()
+    }
     const onVisible = () => {
-      if (document.visibilityState === "visible") { void refreshUser() }
+      if (document.visibilityState === "visible") {
+        void refreshUser()
+      }
     }
 
     window.addEventListener("focus", onFocus)
     document.addEventListener("visibilitychange", onVisible)
 
-    // do an immediate refresh when this effect starts
-    void refreshUser()
-
     return () => {
       window.removeEventListener("focus", onFocus)
       document.removeEventListener("visibilitychange", onVisible)
     }
-  }, [user?.uid])
+  }, [refreshUser, user])
 
   const login = async (email: string, password: string) => {
-    const result = await signInWithEmailAndPassword(auth, email, password)
+    const safeEmail = emailSchema.parse(email)
+    const result = await signInWithEmailAndPassword(auth, safeEmail, password)
     // After login, reload to ensure the latest emailVerified flag
     await result.user.reload()
     setUser(auth.currentUser)
@@ -100,10 +142,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const register = async (email: string, password: string) => {
-    if (!email.endsWith("@gmail.com")) {
-      throw new Error("Only Gmail addresses are allowed.")
-    }
-    const result = await createUserWithEmailAndPassword(auth, email, password)
+    const credentials = credentialsSchema.parse({ email, password })
+    const result = await createUserWithEmailAndPassword(
+      auth,
+      credentials.email,
+      credentials.password
+    )
     await sendEmailVerification(result.user)
     // Keep them logged in but unverified until they confirm
     await result.user.reload()
@@ -127,6 +171,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         isVerified: !!user?.emailVerified,
+        isAdmin,
+        isClaimsLoading,
         isLoading,
         login,
         register,

@@ -20,11 +20,10 @@ export const metadata: Metadata = {
   },
 }
 
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>
+      <body className={inter.className}>
         <AuthProvider>
           <CartProvider>
             <ProductProvider>{children}</ProductProvider>
@@ -34,5 +33,3 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   )
 }
-
-

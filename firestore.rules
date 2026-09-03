@@ -1,0 +1,56 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update: if isOwner(userId)
+        && request.resource.data.keys().hasOnly([
+          'name', 'address', 'phone', 'photoURL', 'email', 'updatedAt'
+        ])
+        && (!request.resource.data.keys().hasAny(['name'])
+          || (request.resource.data.name is string && request.resource.data.name.size() <= 100))
+        && (!request.resource.data.keys().hasAny(['address'])
+          || (request.resource.data.address is string && request.resource.data.address.size() <= 300))
+        && (!request.resource.data.keys().hasAny(['phone'])
+          || (request.resource.data.phone is string && request.resource.data.phone.size() <= 15))
+        && (!request.resource.data.keys().hasAny(['photoURL'])
+          || (request.resource.data.photoURL is string && request.resource.data.photoURL.size() <= 1500000))
+        && (!request.resource.data.keys().hasAny(['email'])
+          || request.resource.data.email == request.auth.token.email);
+      allow delete: if isOwner(userId);
+    }
+
+    match /orders/{orderId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+      allow create, delete: if false;
+    }
+
+    match /stripeEvents/{eventId} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
