@@ -31,6 +31,9 @@ export default defineConfig({
         "app/profile/page.tsx",
         "components/checkout/**/*.tsx",
         "app/checkout/page.tsx",
+        "lib/admin/**/*.ts",
+        "components/admin/**/*.tsx",
+        "app/admin/page.tsx",
       ],
       exclude: ["**/*.{spec,test}.{ts,tsx}", "**/*.d.ts", "**/*-repository.ts"],
       thresholds: {
