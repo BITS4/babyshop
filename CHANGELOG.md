@@ -4,9 +4,19 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/en/1.1.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-03
+
+### Added
+
+- Page-level profile, checkout, and admin integration tests with reusable Firebase and Stripe fixtures
+- Browser bundle budgets and pull-request dependency vulnerability review
+- Profile validation/repository modules, payment-intent hook, typed order client, and guarded image processor
+
 ### Changed
 
 - Refreshed Stripe, Tailwind, PostCSS, TypeScript, and React/Node type dependencies after full test and build verification
+- Split profile, checkout, and admin screens into typed UI, persistence, and network boundaries with page-level integration tests
+- Made lint, typecheck, test, build, audit, dependency review, and bundle budget gates explicit in CI
 
 ## [1.0.0] - 2026-09-03
 
@@ -30,5 +40,6 @@ All notable changes follow [Keep a Changelog](https://keepachangelog.com/en/1.1.
 
 - Vendored `node_modules`, duplicate configuration, stale static pages, and an unused archive
 
-[Unreleased]: https://github.com/BITS4/babyshop/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/BITS4/babyshop/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/BITS4/babyshop/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/BITS4/babyshop/releases/tag/v1.0.0
