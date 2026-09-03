@@ -1,0 +1,7 @@
+.next
+coverage
+node_modules
+out
+package-lock.json
+public/404.html
+public/index.html
