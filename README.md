@@ -43,11 +43,9 @@ Domain code lives under `lib/`; external SDK setup is isolated under `lib/server
 
 - Node.js 24 or newer
 - npm 10 or newer
-- A Firebase project for live authentication and data
-- A Stripe test account for card payments
 - Docker 24+ only if using the container workflow
 
-The quality suite and production build run without external credentials. Live authentication, catalog data, orders, and card payments require the integration variables below.
+The quality suite, page/component integration tests, and production build run with deterministic Firebase and Stripe fixtures and require no cloud account, secret, network call, emulator, or local database. A Firebase project and Stripe test account are optional integrations needed only to exercise live authentication, catalog data, orders, and card payments.
 
 ## Fresh-clone setup
 
@@ -81,6 +79,8 @@ Open <http://localhost:3000>. Replace the demo values in `.env.local` to use liv
 | `NEXT_PUBLIC_SENTRY_DSN`                   | Optional           | Browser Sentry DSN                                                                 |
 | `SENTRY_TRACES_SAMPLE_RATE`                | Optional           | Server trace sample rate, `0` to `1`                                               |
 | `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE`    | Optional           | Browser trace sample rate, `0` to `1`                                              |
+| `NODE_ENV`                                 | Framework          | Runtime mode: `development`, `test`, or `production`                               |
+| `NEXT_RUNTIME`                             | Framework-managed  | Next.js runtime marker; normally injected automatically                            |
 
 Never commit `.env.local` or service-account JSON. `.gitignore` excludes environment files while preserving `.env.example`.
 
@@ -94,12 +94,14 @@ Never commit `.env.local` or service-account JSON. `.gitignore` excludes environ
 | `npm run format:check`  | Verify Prettier formatting                          |
 | `npm run lint`          | Run ESLint with zero warnings allowed               |
 | `npm run typecheck`     | Run strict TypeScript checks without emitting files |
-| `npm test`              | Run all Vitest specs once                           |
+| `npm test`              | Run all tests and enforce numeric coverage          |
+| `npm run test:unit`     | Run tests once without collecting coverage          |
 | `npm run test:coverage` | Run tests and enforce numeric coverage thresholds   |
-| `npm run audit`         | Fail on high or critical production advisories      |
+| `npm run audit`         | Fail on high or critical dependency advisories      |
+| `npm run bundle:size`   | Enforce the production static-asset budget          |
 | `npm run check`         | Run the complete local quality pipeline             |
 
-Coverage thresholds are explicit in `vitest.config.mts`: 90% statements, lines, and functions plus 85% branches across auth, catalog, cart, checkout, order, payment, security, and metrics domains.
+Coverage thresholds are explicit in `vitest.config.mts`: 95% statements and lines, 91% functions, and 88% branches across auth, catalog, cart, profile, checkout, admin, order, payment, security, and metrics domains.
 
 ## API
 
@@ -132,7 +134,7 @@ The container runs as a non-root user, uses Next.js standalone output, and inclu
 
 ## CI and security
 
-Every push and pull request runs independent, blocking jobs for formatting/lint/typecheck, tests with coverage, production build, and production dependency audit. CodeQL scans pushes, pull requests, and weekly. Dependabot covers npm, GitHub Actions, and Docker.
+Every push and pull request runs explicitly named, blocking `format`, `lint`, `typecheck`, `test`, `build`, and `audit` jobs. The build waits for all four source-quality gates and enforces a static bundle budget. Pull requests also receive a dependency vulnerability review. CodeQL scans pushes, pull requests, and weekly. Dependabot covers npm, GitHub Actions, and Docker.
 
 See [Quality](docs/QUALITY.md), [Security policy](SECURITY.md), and [Contribution guide](CONTRIBUTING.md) before making changes.
 

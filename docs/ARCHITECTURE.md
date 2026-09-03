@@ -22,12 +22,16 @@ BabyShop is a Next.js full-stack application. React client components own presen
 - `lib/auth/`: credential schemas
 - `lib/catalog/`: product decoding, filtering, sorting, and image URL normalization
 - `lib/cart/`: immutable cart operations and guarded persistence
-- `lib/checkout/`: customer form validation
+- `lib/checkout/`: customer validation, payment-intent hook, and authenticated order client
+- `lib/profile/`: profile schema and Firestore repository boundary
+- `lib/admin/`: validated browser image processing
 - `lib/orders/`: receipt parsing and trusted order orchestration
 - `lib/payments/`: payment schemas, catalog pricing, idempotency, and webhook mapping
 - `lib/security/`: safe errors, upload validation, rate limits, and request parsing
 - `lib/observability/`: Pino, Sentry adapters, and Prometheus metrics
 - `lib/server/`: privileged SDK adapters that must not be imported into browser code
+
+The profile, checkout, and admin route files are composition layers. Reusable UI lives in feature-named component folders; persistence and network calls live behind typed `lib/` boundaries. Page-level integration tests replace Firebase and Stripe with deterministic fixtures from `test/mocks`.
 
 ## Failure behavior
 

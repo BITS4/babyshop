@@ -15,7 +15,9 @@
 
 Dependabot checks production, development, GitHub Actions, and Docker dependencies weekly. Updates must pass CI and should remain grouped by ecosystem and dependency type. Major upgrades require a focused commit with migration notes and tests.
 
-Production audit policy blocks high and critical findings. The `uuid` override exists to force Firebase Admin's legacy HTTP subtree onto the first patched CommonJS-compatible major; remove it when upstream packages adopt that version directly.
+The audit policy blocks high and critical findings across production and development dependencies. The `uuid` override exists to force Firebase Admin's legacy HTTP subtree onto the first patched CommonJS-compatible major; remove it when upstream packages adopt that version directly.
+
+The current lockfile inventory and duplicate-install review are recorded in [DEPENDENCY_AUDIT.md](DEPENDENCY_AUDIT.md). CI additionally blocks vulnerable dependency changes during pull requests and constrains browser bundle growth after production builds.
 
 ## Reviewed major versions
 
