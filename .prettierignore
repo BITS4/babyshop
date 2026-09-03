@@ -1,6 +1,7 @@
 .next
 coverage
 node_modules
+next-env.d.ts
 out
 package-lock.json
 public/404.html
