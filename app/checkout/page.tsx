@@ -1,29 +1,19 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useCart } from "../../context/CartContext"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/context/AuthContext"
 import { db } from "@/app/firebase"
-import {
-  doc,
-  getDoc,
-  addDoc,
-  collection,
-  serverTimestamp,
-} from "firebase/firestore"
+import { doc, getDoc } from "firebase/firestore"
 
 import { loadStripe } from "@stripe/stripe-js"
-import {
-  Elements,
-  CardElement,
-  useStripe,
-  useElements,
-} from "@stripe/react-stripe-js"
+import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js"
+import { cartTotalCents } from "@/lib/cart/cart"
+import { validateCheckoutCustomer } from "@/lib/checkout/customer"
 
-const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
-)
+const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+const stripePromise = publishableKey ? loadStripe(publishableKey) : null
 
 /* ---------------- INTERNAL FORM ---------------- */
 
@@ -43,7 +33,12 @@ function CheckoutForm() {
   const [nameLocked, setNameLocked] = useState(false)
   const [loadingProfile, setLoadingProfile] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [clientSecret, setClientSecret] = useState<string | null>(null)
+  const [paymentIntent, setPaymentIntent] = useState<{
+    fingerprint: string
+    clientSecret: string
+  } | null>(null)
+  const [paymentError, setPaymentError] = useState("")
+  const idempotencyKeys = useRef(new Map<string, string>())
 
   /* ---------- LOAD PROFILE ---------- */
   useEffect(() => {
@@ -75,26 +70,64 @@ function CheckoutForm() {
   }, [user?.uid])
 
   /* ---------- CREATE PAYMENT INTENT ---------- */
-  const totalAmount = cart.reduce(
-    (acc, i) => acc + Number(i.price ?? 0) * Number(i.quantity ?? 1),
-    0
+  const totalCents = useMemo(() => cartTotalCents(cart), [cart])
+  const totalAmount = totalCents / 100
+  const cartFingerprint = useMemo(
+    () =>
+      cart
+        .map((item) => `${item.id}:${item.quantity}`)
+        .sort()
+        .join("|"),
+    [cart]
   )
+  const activeClientSecret =
+    paymentIntent?.fingerprint === cartFingerprint ? paymentIntent.clientSecret : null
 
   useEffect(() => {
-    if (paymentMethod !== "card" || clientSecret) return
+    if (paymentMethod !== "card" || activeClientSecret || !user || !cartFingerprint) return
+
+    const controller = new AbortController()
 
     const createIntent = async () => {
-      const res = await fetch("/api/create-payment-intent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: Math.round(totalAmount * 100) }),
-      })
-      const data = await res.json()
-      setClientSecret(data.clientSecret)
+      try {
+        setPaymentError("")
+        const token = await user.getIdToken()
+        const idempotencyKey =
+          idempotencyKeys.current.get(cartFingerprint) ?? `checkout:${crypto.randomUUID()}`
+        idempotencyKeys.current.set(cartFingerprint, idempotencyKey)
+        const response = await fetch("/api/create-payment-intent", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            "Idempotency-Key": idempotencyKey,
+          },
+          body: JSON.stringify({
+            items: cart.map((item) => ({ productId: item.id, quantity: item.quantity })),
+            currency: "usd",
+          }),
+          signal: controller.signal,
+        })
+        const data = (await response.json()) as {
+          clientSecret?: string
+          error?: { message?: string }
+        }
+        if (!response.ok || !data.clientSecret) {
+          throw new Error(data.error?.message ?? "Payment could not be initialized")
+        }
+        setPaymentIntent({ fingerprint: cartFingerprint, clientSecret: data.clientSecret })
+      } catch (error: unknown) {
+        if (!controller.signal.aborted) {
+          setPaymentError(
+            error instanceof Error ? error.message : "Payment could not be initialized"
+          )
+        }
+      }
     }
 
-    createIntent()
-  }, [paymentMethod, totalAmount])
+    void createIntent()
+    return () => controller.abort()
+  }, [activeClientSecret, cart, cartFingerprint, paymentMethod, user])
 
   /* ---------- SUBMIT ---------- */
   const handleSubmit = async (e: React.FormEvent) => {
@@ -106,9 +139,9 @@ function CheckoutForm() {
       return
     }
 
-    const digits = phone.replace(/\D/g, "")
-    if (!name.trim() || !address.trim() || digits.length < 8) {
-      alert("Please fill all fields correctly.")
+    const customer = validateCheckoutCustomer({ name, address, phone, paymentMethod })
+    if (!customer.success) {
+      alert(customer.error.issues[0]?.message ?? "Please fill all fields correctly.")
       return
     }
 
@@ -119,17 +152,17 @@ function CheckoutForm() {
 
       /* ---- CARD PAYMENT ---- */
       if (paymentMethod === "card") {
-        if (!stripe || !elements || !clientSecret) {
+        if (!stripe || !elements || !activeClientSecret) {
           alert("Payment not ready.")
           setSubmitting(false)
           return
         }
 
-        const result = await stripe.confirmCardPayment(clientSecret, {
+        const result = await stripe.confirmCardPayment(activeClientSecret, {
           payment_method: {
             card: elements.getElement(CardElement)!,
             billing_details: {
-              name,
+              name: customer.data.name,
               email: user.email,
             },
           },
@@ -144,34 +177,35 @@ function CheckoutForm() {
         paymentIntentId = result.paymentIntent?.id
       }
 
-      /* ---- SAVE ORDER ---- */
-      await addDoc(collection(db, "orders"), {
-        userId: user.uid,
-        email: user.email,
-        name: name.trim(),
-        address: address.trim(),
-        phone: digits,
-        paymentMethod,
-        paid: paymentMethod === "card",
-        paymentIntentId, 
-        status: "pending",
-        items: cart.map(i => ({
-          id: String(i.id ?? ""),
-          name: String(i.name ?? ""),
-          price: Number(i.price ?? 0),
-          quantity: Number(i.quantity ?? 1),
-          image: String(i.image ?? ""),
-        })),
-        createdAt: serverTimestamp(),
+      /* ---- SAVE VERIFIED ORDER ---- */
+      const token = await user.getIdToken()
+      const orderResponse = await fetch("/api/orders", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: customer.data.name,
+          address: customer.data.address,
+          phone: customer.data.phone,
+          paymentMethod,
+          paymentIntentId,
+          items: cart.map((item) => ({ productId: item.id, quantity: item.quantity })),
+        }),
       })
+      const orderResult = (await orderResponse.json()) as { error?: { message?: string } }
+      if (!orderResponse.ok) {
+        throw new Error(orderResult.error?.message ?? "Order could not be saved")
+      }
 
       localStorage.setItem(
         "lastOrder",
         JSON.stringify({
-          name,
+          name: customer.data.name,
           email: user.email,
-          address,
-          phone: digits,
+          address: customer.data.address,
+          phone: customer.data.phone,
           items: cart,
           paymentMethod,
           paid: paymentMethod === "card",
@@ -189,67 +223,60 @@ function CheckoutForm() {
 
   if (loadingProfile) {
     return (
-      <div className="min-h-screen bg-pink-50 flex items-center justify-center text-gray-900">
+      <div className="flex min-h-screen items-center justify-center bg-pink-50 text-gray-900">
         Loading…
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-pink-50 py-10 px-4 text-gray-900">
-      <div className="max-w-md mx-auto">
-        <button
-          onClick={() => router.back()}
-          className="mb-4 text-pink-600 hover:underline"
-        >
+    <div className="min-h-screen bg-pink-50 px-4 py-10 text-gray-900">
+      <div className="mx-auto max-w-md">
+        <button onClick={() => router.back()} className="mb-4 text-pink-600 hover:underline">
           ← Back
         </button>
 
-        <h1 className="text-3xl font-bold text-center text-pink-600 mb-6">
-          Checkout
-        </h1>
+        <h1 className="mb-6 text-center text-3xl font-bold text-pink-600">Checkout</h1>
 
         <form
           onSubmit={handleSubmit}
-          className="bg-white p-6 rounded-lg shadow-md border border-pink-100 space-y-4 text-gray-900"
+          className="space-y-4 rounded-lg border border-pink-100 bg-white p-6 text-gray-900 shadow-md"
         >
           {/* Name */}
           <div>
-            <label className="block font-semibold mb-1">Full Name</label>
+            <label className="mb-1 block font-semibold">Full Name</label>
             <input
               value={name}
-              onChange={e => setName(e.target.value)}
+              onChange={(e) => setName(e.target.value)}
               disabled={nameLocked}
-              className="w-full border px-3 py-2 rounded text-gray-900"
+              className="w-full rounded border px-3 py-2 text-gray-900"
             />
           </div>
 
           {/* Address */}
           <div>
-            <label className="block font-semibold mb-1">
-              Shipping Address
-            </label>
+            <label className="mb-1 block font-semibold">Shipping Address</label>
             <textarea
               value={address}
-              onChange={e => setAddress(e.target.value)}
+              onChange={(e) => setAddress(e.target.value)}
               rows={3}
-              className="w-full border px-3 py-2 rounded text-gray-900"
+              className="w-full rounded border px-3 py-2 text-gray-900"
             />
           </div>
 
           {/* Phone */}
           <div>
-            <label className="block font-semibold mb-1">Phone</label>
+            <label className="mb-1 block font-semibold">Phone</label>
             <input
               value={phone}
-              onChange={e => setPhone(e.target.value.replace(/\D/g, ""))}
-              className="w-full border px-3 py-2 rounded text-gray-900"
+              onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+              className="w-full rounded border px-3 py-2 text-gray-900"
             />
           </div>
 
           {/* Payment Method */}
-          <div className="border rounded p-3">
-            <p className="font-semibold mb-2">Payment Method</p>
+          <div className="rounded border p-3">
+            <p className="mb-2 font-semibold">Payment Method</p>
 
             <label className="flex items-center gap-2">
               <input
@@ -260,7 +287,7 @@ function CheckoutForm() {
               Cash on Delivery
             </label>
 
-            <label className="flex items-center gap-2 mt-2">
+            <label className="mt-2 flex items-center gap-2">
               <input
                 type="radio"
                 checked={paymentMethod === "card"}
@@ -271,8 +298,8 @@ function CheckoutForm() {
           </div>
 
           {/* Card UI */}
-          {paymentMethod === "card" && clientSecret && (
-            <div className="border rounded p-3 bg-white">
+          {paymentMethod === "card" && activeClientSecret && (
+            <div className="rounded border bg-white p-3">
               <CardElement
                 options={{
                   style: {
@@ -286,20 +313,27 @@ function CheckoutForm() {
               />
             </div>
           )}
+          {paymentMethod === "card" && paymentError && (
+            <p role="alert" className="text-sm text-red-600">
+              {paymentError}
+            </p>
+          )}
           <div className="text-right font-semibold text-pink-600">
             Total: ${totalAmount.toFixed(2)}
           </div>
           <button
             type="submit"
-            disabled={submitting || 
-              (paymentMethod === "card" && (!stripe || !elements || !clientSecret))}
-            className="w-full bg-pink-500 text-white py-2 rounded hover:bg-pink-600"
+            disabled={
+              submitting ||
+              (paymentMethod === "card" && (!stripe || !elements || !activeClientSecret))
+            }
+            className="w-full rounded bg-pink-500 py-2 text-white hover:bg-pink-600"
           >
             {submitting
               ? "Processing…"
               : paymentMethod === "card"
-              ? "Pay & Place Order"
-              : "Place Order"}
+                ? "Pay & Place Order"
+                : "Place Order"}
           </button>
         </form>
       </div>
