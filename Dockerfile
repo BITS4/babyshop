@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM node:24.16.0-alpine3.23@sha256:2bdb65ed1dab192432bc31c95f94155ca5ad7fc1392fb7eb7526ab682fa5bf14 AS base
+FROM node:26.8-alpine3.23@sha256:a3024faf41c40992531ecfb00604384665be870a44626afaf181c6d583f89296 AS base
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 
